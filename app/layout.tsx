@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { NuqsAdapter } from 'nuqs/adapters/next/app'
+import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { Provider } from "jotai";
 
 import "./globals.css";
@@ -19,8 +19,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TaskOrbit Clone",
-  description: "Automation platform",
+  title: {
+    default: "TaskOrbit",
+    template: "%s | TaskOrbit",
+  },
+  description:
+    "Visual workflow automation platform for building, running, and monitoring event-driven automations.",
 };
 
 export default function RootLayout({
@@ -36,12 +40,9 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <TRPCReactProvider>
           <NuqsAdapter>
-            <Provider>
-          {children}
-          </Provider>
+            <Provider>{children}</Provider>
           </NuqsAdapter>
         </TRPCReactProvider>
-
         <Toaster richColors />
       </body>
     </html>
