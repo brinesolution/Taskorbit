@@ -1,6 +1,11 @@
 import { z } from "zod";
 import type { Node, Edge } from "@xyflow/react";
 import { generateSlug } from "random-word-slugs";
+import { randomUUID } from "node:crypto";
+import {
+  stripCredentialReferences,
+  workflowImportSchema,
+} from "../import-format";
 const NodeType = {
   INITIAL: "INITIAL",
   MANUAL_TRIGGER: "MANUAL_TRIGGER",
@@ -10,6 +15,8 @@ const NodeType = {
   GEMINI: "GEMINI",
   DISCORD: "DISCORD",
   WHATSAPP: "WHATSAPP",
+  OPENAI: "OPENAI",
+  SLACK: "SLACK",
 } as const;
 
 type NodeTypeValue = (typeof NodeType)[keyof typeof NodeType];
@@ -68,6 +75,52 @@ export const workflowsRouter = createTRPCRouter({
       },
     });
   }),
+
+  importWorkflow: protectedProcedure
+    .input(workflowImportSchema)
+    .mutation(async ({ ctx, input }) => {
+      const importedNodeIds = new Map<string, string>(
+        input.graph.nodes.map((node) => [node.id, randomUUID()] as const)
+      );
+
+      return prisma.$transaction(async (tx: any) => {
+        const workflow = await tx.workflow.create({
+          data: {
+            name: input.name.trim(),
+            userId: ctx.auth.user.id,
+          },
+        });
+
+        if (input.graph.nodes.length > 0) {
+          await tx.node.createMany({
+            data: input.graph.nodes.map((node) => ({
+              id: importedNodeIds.get(node.id)!,
+              workflowId: workflow.id,
+              name: node.type,
+              type: node.type as NodeTypeValue,
+              position: node.position,
+              data: JSON.parse(
+                JSON.stringify(stripCredentialReferences(node.data))
+              ),
+            })),
+          });
+        }
+
+        if (input.graph.edges.length > 0) {
+          await tx.connection.createMany({
+            data: input.graph.edges.map((edge) => ({
+              workflowId: workflow.id,
+              fromNodeId: importedNodeIds.get(edge.source)!,
+              toNodeId: importedNodeIds.get(edge.target)!,
+              fromOutput: edge.sourceHandle ?? "main",
+              toInput: edge.targetHandle ?? "main",
+            })),
+          });
+        }
+
+        return { id: workflow.id, name: workflow.name };
+      });
+    }),
 
   remove: protectedProcedure
     .input(z.object({ id: z.string() }))

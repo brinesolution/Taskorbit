@@ -1,5 +1,7 @@
 "use client";
 
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -14,14 +16,18 @@ import {
   PlayIcon,
   ClockIcon,
   GitBranchIcon,
+  UploadIcon,
 } from "lucide-react";
 
 import { useWorkflowsParams } from "../hooks/use-workflows-params";
 import {
   useCreateWorkflow,
+  useImportWorkflow,
   useRemoveWorkflow,
   useSuspenseWorkflows,
 } from "../hooks/use-workflows";
+
+import { parseWorkflowFile } from "../import-format";
 
 import {
   EntityHeader,
@@ -153,6 +159,56 @@ export const WorkflowsList = () => {
   );
 };
 
+const WorkflowImportAction = () => {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
+  const importWorkflow = useImportWorkflow();
+  const [error, setError] = useState("");
+
+  const handleFile = async (file?: File) => {
+    if (!file) return;
+    setError("");
+    try {
+      const workflow = parseWorkflowFile(await file.text());
+      const created = await importWorkflow.mutateAsync(workflow);
+      router.push(`/workflows/${created.id}`);
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Unable to import this workflow."
+      );
+    } finally {
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        ref={inputRef}
+        className="sr-only"
+        type="file"
+        accept=".taskorbit.json,.json,application/json"
+        aria-label="Import workflow file"
+        onChange={(event) => void handleFile(event.target.files?.[0])}
+      />
+      <Button
+        type="button"
+        variant="outline"
+        disabled={importWorkflow.isPending}
+        onClick={() => inputRef.current?.click()}
+      >
+        <UploadIcon className="mr-2 size-4" />
+        {importWorkflow.isPending ? "Importing..." : "Import"}
+      </Button>
+      {error && (
+        <span className="max-w-64 text-xs text-destructive" role="alert">
+          {error}
+        </span>
+      )}
+    </div>
+  );
+};
+
 export const WorkflowsHeader = ({
   disabled,
 }: {
@@ -168,6 +224,7 @@ export const WorkflowsHeader = ({
       newButtonLabel="New workflow"
       disabled={disabled}
       isCreating={createWorkflow.isPending}
+      actions={<WorkflowImportAction />}
     />
   );
 };

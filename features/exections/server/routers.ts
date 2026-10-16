@@ -41,14 +41,25 @@ export const executionsRouter = createTRPCRouter({
         pageSize: z
           .number()
           .default(PAGINATION.DEFAULT_PAGE_SIZE),
+        search: z.string().trim().max(100).default(""),
+        status: z.enum(["ALL", "RUNNING", "SUCCESS", "FAILED"]).catch("ALL"),
       })
     )
     .query(async ({ ctx, input }) => {
-      const { page, pageSize } = input;
+      const { page, pageSize, search, status } = input;
 
       const where = {
+        status: status === "ALL" ? undefined : status,
         workflow: {
           userId: ctx.auth.user.id,
+          ...(search
+            ? {
+                name: {
+                  contains: search,
+                  mode: "insensitive" as const,
+                },
+              }
+            : {}),
         },
       };
 

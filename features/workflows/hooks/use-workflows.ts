@@ -44,6 +44,21 @@ export const useCreateWorkflow = () => {
   );
 };
 
+export const useImportWorkflow = () => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  return useMutation(
+    trpc.workflows.importWorkflow.mutationOptions({
+      onSuccess: async () => {
+        await queryClient.invalidateQueries(
+          trpc.workflows.getMany.queryFilter()
+        );
+      },
+    })
+  );
+};
+
 export const useRemoveWorkflow = () => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();

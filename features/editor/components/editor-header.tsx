@@ -6,7 +6,7 @@ import {
   useState,
 } from "react";
 
-import { SaveIcon } from "lucide-react";
+import { DownloadIcon, SaveIcon } from "lucide-react";
 import { useAtomValue } from "jotai";
 
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,54 @@ import {
 } from "@/features/workflows/hooks/use-workflows";
 
 import { editorAtom } from "../store/atoms";
+import { createWorkflowFile } from "@/features/workflows/import-format";
+
+export const EditorExportButton = ({
+  workflowId,
+}: {
+  workflowId: string;
+}) => {
+  const editor = useAtomValue(editorAtom);
+  const { data: workflow } = useSuspenseWorkflow(workflowId);
+
+  const handleExport = () => {
+    if (!editor || !workflow) return;
+    const graph = {
+      nodes: editor.getNodes().map((node) => ({
+        id: node.id,
+        type: node.type ?? "INITIAL",
+        position: { x: node.position.x, y: node.position.y },
+        data: (node.data ?? {}) as Record<string, unknown>,
+      })),
+      edges: editor.getEdges().map((edge) => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        sourceHandle: edge.sourceHandle ?? null,
+        targetHandle: edge.targetHandle ?? null,
+      })),
+    };
+    const file = new Blob([createWorkflowFile(workflow.name, graph)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(file);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download =
+      (workflow.name.trim() || "taskorbit-workflow")
+        .replace(/[^a-z0-9-_]+/gi, "-")
+        .replace(/^-|-$/g, "") + ".taskorbit.json";
+    anchor.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  return (
+    <Button variant="outline" onClick={handleExport} disabled={!editor}>
+      <DownloadIcon className="mr-2 size-4" />
+      Export
+    </Button>
+  );
+};
 
 export const EditorSaveButton = ({
   workflowId,
@@ -206,9 +254,10 @@ export const EditorHeader = ({
           workflowId={workflowId}
         />
 
-        <EditorSaveButton
-          workflowId={workflowId}
-        />
+        <div className="flex items-center gap-2">
+          <EditorExportButton workflowId={workflowId} />
+          <EditorSaveButton workflowId={workflowId} />
+        </div>
       </div>
     </header>
   );
