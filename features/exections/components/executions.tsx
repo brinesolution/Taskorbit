@@ -6,7 +6,7 @@ import { SearchIcon } from "lucide-react";
 
 import { useSuspenseExecutions } from "../hooks/use-executions";
 import { useExecutionsParams } from "../hooks/use-executions-params";
-import { EXECUTION_STATUSES } from "../params";
+import { normalizeExecutionStatus } from "../params";
 
 type ExecutionItem = {
   id: string;
@@ -56,10 +56,7 @@ export const ExecutionsList = () => {
           className="h-11 rounded-xl border bg-background px-3 text-sm"
           value={params.status}
           onChange={(event) => {
-            const status =
-              EXECUTION_STATUSES.find(
-                (value) => value === event.target.value
-              ) ?? "ALL";
+            const status = normalizeExecutionStatus(event.target.value);
             setParams({ status, page: 1 });
           }}
         >
