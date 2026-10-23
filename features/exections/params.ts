@@ -1,4 +1,8 @@
-import { parseAsInteger, parseAsString } from "nuqs/server";
+import {
+  parseAsInteger,
+  parseAsString,
+  parseAsStringEnum,
+} from "nuqs/server";
 
 import { PAGINATION } from "@/config/constants";
 
@@ -15,7 +19,7 @@ export const executionsParams = {
     .withDefault("")
     .withOptions({ clearOnDefault: true }),
 
-  status: parseAsString
+  status: parseAsStringEnum(["ALL", "RUNNING", "SUCCESS", "FAILED"] as const)
     .withDefault("ALL")
     .withOptions({ clearOnDefault: true }),
 };
