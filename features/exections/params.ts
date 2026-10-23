@@ -13,6 +13,9 @@ export const EXECUTION_STATUSES = [
   "FAILED",
 ] as const;
 
+export const normalizeExecutionStatus = (value: string) =>
+  EXECUTION_STATUSES.find((status) => status === value) ?? "ALL";
+
 export const executionsParams = {
   page: parseAsInteger
     .withDefault(PAGINATION.DEFAULT_PAGE)
