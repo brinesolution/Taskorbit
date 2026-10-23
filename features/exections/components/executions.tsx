@@ -6,6 +6,7 @@ import { SearchIcon } from "lucide-react";
 
 import { useSuspenseExecutions } from "../hooks/use-executions";
 import { useExecutionsParams } from "../hooks/use-executions-params";
+import { EXECUTION_STATUSES } from "../params";
 
 type ExecutionItem = {
   id: string;
@@ -54,9 +55,13 @@ export const ExecutionsList = () => {
           aria-label="Filter executions by status"
           className="h-11 rounded-xl border bg-background px-3 text-sm"
           value={params.status}
-          onChange={(event) =>
-            setParams({ status: event.target.value, page: 1 })
-          }
+          onChange={(event) => {
+            const status =
+              EXECUTION_STATUSES.find(
+                (value) => value === event.target.value
+              ) ?? "ALL";
+            setParams({ status, page: 1 });
+          }}
         >
           <option value="ALL">All statuses</option>
           <option value="RUNNING">Running</option>
