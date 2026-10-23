@@ -6,6 +6,13 @@ import {
 
 import { PAGINATION } from "@/config/constants";
 
+export const EXECUTION_STATUSES = [
+  "ALL",
+  "RUNNING",
+  "SUCCESS",
+  "FAILED",
+] as const;
+
 export const executionsParams = {
   page: parseAsInteger
     .withDefault(PAGINATION.DEFAULT_PAGE)
@@ -19,7 +26,7 @@ export const executionsParams = {
     .withDefault("")
     .withOptions({ clearOnDefault: true }),
 
-  status: parseAsStringEnum(["ALL", "RUNNING", "SUCCESS", "FAILED"] as const)
+  status: parseAsStringEnum(EXECUTION_STATUSES)
     .withDefault("ALL")
     .withOptions({ clearOnDefault: true }),
 };
