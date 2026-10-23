@@ -29,7 +29,7 @@ export const executionsParams = {
     .withDefault("")
     .withOptions({ clearOnDefault: true }),
 
-  status: parseAsStringEnum(EXECUTION_STATUSES)
+  status: parseAsStringEnum([...EXECUTION_STATUSES])
     .withDefault("ALL")
     .withOptions({ clearOnDefault: true }),
 };
