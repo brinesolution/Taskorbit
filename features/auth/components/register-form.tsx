@@ -37,7 +37,11 @@ const formSchema = z.object({
   }),
 });
 
-export function RegisterForm() {
+export function RegisterForm({
+  providers,
+}: {
+  providers: { github: boolean; google: boolean };
+}) {
   const router = useRouter();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -90,55 +94,61 @@ export function RegisterForm() {
     }
 
     toast.success("Account created successfully");
-    router.push("/login");
+    router.push("/workflows");
     router.refresh();
   };
 
   return (
-    <Card className="w-full max-w-md border border-neutral-200 bg-white text-black shadow-sm">
+    <Card className="w-full max-w-md border-zinc-800 bg-zinc-950 text-zinc-100 shadow-xl shadow-black/20">
       <CardHeader className="text-center">
         <CardTitle className="text-2xl font-semibold">
           Create account
         </CardTitle>
-        <CardDescription className="text-neutral-500">
+        <CardDescription className="text-zinc-400">
           Sign up to continue
         </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-6">
-        <div className="grid gap-4">
-          <Button
-            onClick={signInGithub}
-            variant="outline"
-            className="h-12 w-full border-neutral-200 bg-white text-black hover:bg-neutral-100"
-            type="button"
-          >
-            <Image
-              src="/logos/github.svg"
-              alt="GitHub"
-              width={20}
-              height={20}
-              className="mr-2"
-            />
-            Continue with GitHub
-          </Button>
+        {(providers.github || providers.google) && (
+          <div className="grid gap-3">
+            {providers.github && (
+              <Button
+                onClick={signInGithub}
+                variant="outline"
+                className="h-12 w-full border-zinc-700 bg-zinc-900 text-zinc-100 hover:bg-zinc-800"
+                type="button"
+              >
+                <Image
+                  src="/logos/github.svg"
+                  alt=""
+                  width={20}
+                  height={20}
+                  className="mr-2 dark:invert"
+                />
+                Continue with GitHub
+              </Button>
+            )}
 
-          <Button
-            onClick={signInGoogle}
-            variant="outline"
-            className="h-12 w-full border-neutral-200 bg-white text-black hover:bg-neutral-100"
-            type="button"
-          >
-            <Image
-              src="/logos/google.svg"
-              alt="Google"
-              width={20}
-              height={20}
-              className="mr-2"
-            />
-            Continue with Google
-          </Button>
-        </div>
+            {providers.google && (
+              <Button
+                onClick={signInGoogle}
+                variant="outline"
+                className="h-12 w-full border-zinc-700 bg-zinc-900 text-zinc-100 hover:bg-zinc-800"
+                type="button"
+              >
+                <Image
+                  src="/logos/google.svg"
+                  alt=""
+                  width={20}
+                  height={20}
+                  className="mr-2"
+                />
+                Continue with Google
+              </Button>
+            )}
+          </div>
+        )}
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-6">
@@ -147,11 +157,11 @@ export function RegisterForm() {
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-black">Name</FormLabel>
+                  <FormLabel className="text-zinc-200">Name</FormLabel>
                   <FormControl>
                     <Input
                       placeholder="Om Jha"
-                      className="h-12 border-neutral-200 bg-white text-black"
+                      className="h-12 border-zinc-700 bg-zinc-900 text-zinc-100 placeholder:text-zinc-500"
                       {...field}
                     />
                   </FormControl>
@@ -165,12 +175,12 @@ export function RegisterForm() {
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-black">Email</FormLabel>
+                  <FormLabel className="text-zinc-200">Email</FormLabel>
                   <FormControl>
                     <Input
                       type="email"
                       placeholder="m@example.com"
-                      className="h-12 border-neutral-200 bg-white text-black"
+                      className="h-12 border-zinc-700 bg-zinc-900 text-zinc-100 placeholder:text-zinc-500"
                       {...field}
                     />
                   </FormControl>
@@ -184,12 +194,12 @@ export function RegisterForm() {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-black">Password</FormLabel>
+                  <FormLabel className="text-zinc-200">Password</FormLabel>
                   <FormControl>
                     <Input
                       type="password"
                       placeholder="Create password"
-                      className="h-12 border-neutral-200 bg-white text-black"
+                      className="h-12 border-zinc-700 bg-zinc-900 text-zinc-100 placeholder:text-zinc-500"
                       {...field}
                     />
                   </FormControl>
@@ -201,16 +211,17 @@ export function RegisterForm() {
             <Button
               type="submit"
               className="h-12 w-full bg-[#e85d36] text-white hover:bg-[#d94c2d]"
+              disabled={form.formState.isSubmitting}
             >
-              Sign up
+              {form.formState.isSubmitting ? "Creating account..." : "Sign up"}
             </Button>
           </form>
         </Form>
 
-        <p className="text-center text-sm text-neutral-500">
+        <p className="text-center text-sm text-zinc-500">
           Already have an account?{" "}
-          <Link href="/login" className="text-black underline">
-            Login
+          <Link href="/login" className="text-violet-300 underline">
+            Sign in
           </Link>
         </p>
       </CardContent>

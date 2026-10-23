@@ -69,7 +69,7 @@ export const discordExecutor: NodeExecutor<DiscordData> =
 
     const username = data.username
       ? decode(Handlebars.compile(data.username)(context))
-      : "Nodebase Bot";
+      : "TaskOrbit Bot";
 
     try {
       const response = await ky.post(data.webhookUrl, {

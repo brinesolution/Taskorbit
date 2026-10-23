@@ -3,7 +3,6 @@ import { ErrorBoundary } from "react-error-boundary";
 import { type SearchParams } from "nuqs";
 
 import { HydrateClient } from "@/trpc/server";
-import { requireAuth } from "@/lib/auth-utils";
 
 import { credentialsParamsLoader } from "@/features/credentials/server/params-loader";
 import { prefetchCredentials } from "@/features/credentials/server/prefetch";
@@ -20,8 +19,6 @@ type Props = {
 };
 
 const Page = async ({ searchParams }: Props) => {
-  await requireAuth();
-
   const params = await credentialsParamsLoader(searchParams);
 
   prefetchCredentials(params);

@@ -5,6 +5,19 @@ export type WorkflowTemplate = WorkflowImportFile & {
   integrations: string[];
 };
 
+export function serializeWorkflowTemplate(template: WorkflowTemplate): string {
+  return JSON.stringify(
+    {
+      format: template.format,
+      version: template.version,
+      name: template.name,
+      graph: template.graph,
+    },
+    null,
+    2,
+  );
+}
+
 export const workflowTemplates: WorkflowTemplate[] = [
   {
     format: "taskorbit.workflow",

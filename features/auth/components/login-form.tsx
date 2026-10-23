@@ -33,7 +33,11 @@ const formSchema = z.object({
   password: z.string().min(6),
 });
 
-export function LoginForm() {
+export function LoginForm({
+  providers,
+}: {
+  providers: { github: boolean; google: boolean };
+}) {
   const router = useRouter();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -91,50 +95,56 @@ export function LoginForm() {
   }
 
   return (
-    <Card className="w-full max-w-md border border-neutral-200 bg-white text-black shadow-sm">
+    <Card className="w-full max-w-md border-zinc-800 bg-zinc-950 text-zinc-100 shadow-xl shadow-black/20">
       <CardHeader className="text-center">
         <CardTitle className="text-2xl font-semibold">
           Welcome back
         </CardTitle>
-        <CardDescription className="text-neutral-500">
+        <CardDescription className="text-zinc-400">
           Login to continue
         </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-6">
-        <div className="grid gap-4">
-          <Button
-            onClick={signInGithub}
-            variant="outline"
-            className="h-12 w-full border-neutral-200 bg-white text-black hover:bg-neutral-100"
-            type="button"
-          >
-            <Image
-              src="/logos/github.svg"
-              alt="GitHub"
-              width={20}
-              height={20}
-              className="mr-2"
-            />
-            Continue with GitHub
-          </Button>
+        {(providers.github || providers.google) && (
+          <div className="grid gap-3">
+            {providers.github && (
+              <Button
+                onClick={signInGithub}
+                variant="outline"
+                className="h-12 w-full border-zinc-700 bg-zinc-900 text-zinc-100 hover:bg-zinc-800"
+                type="button"
+              >
+                <Image
+                  src="/logos/github.svg"
+                  alt=""
+                  width={20}
+                  height={20}
+                  className="mr-2 dark:invert"
+                />
+                Continue with GitHub
+              </Button>
+            )}
 
-          <Button
-            onClick={signInGoogle}
-            variant="outline"
-            className="h-12 w-full border-neutral-200 bg-white text-black hover:bg-neutral-100"
-            type="button"
-          >
-            <Image
-              src="/logos/google.svg"
-              alt="Google"
-              width={20}
-              height={20}
-              className="mr-2"
-            />
-            Continue with Google
-          </Button>
-        </div>
+            {providers.google && (
+              <Button
+                onClick={signInGoogle}
+                variant="outline"
+                className="h-12 w-full border-zinc-700 bg-zinc-900 text-zinc-100 hover:bg-zinc-800"
+                type="button"
+              >
+                <Image
+                  src="/logos/google.svg"
+                  alt=""
+                  width={20}
+                  height={20}
+                  className="mr-2"
+                />
+                Continue with Google
+              </Button>
+            )}
+          </div>
+        )}
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-6">
@@ -143,12 +153,12 @@ export function LoginForm() {
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-black">Email</FormLabel>
+                  <FormLabel className="text-zinc-200">Email</FormLabel>
                   <FormControl>
                     <Input
                       type="email"
                       placeholder="m@example.com"
-                      className="h-12 border-neutral-200 bg-white text-black"
+                      className="h-12 border-zinc-700 bg-zinc-900 text-zinc-100 placeholder:text-zinc-500"
                       {...field}
                     />
                   </FormControl>
@@ -162,12 +172,12 @@ export function LoginForm() {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-black">Password</FormLabel>
+                  <FormLabel className="text-zinc-200">Password</FormLabel>
                   <FormControl>
                     <Input
                       type="password"
                       placeholder="Enter your password"
-                      className="h-12 border-neutral-200 bg-white text-black"
+                      className="h-12 border-zinc-700 bg-zinc-900 text-zinc-100 placeholder:text-zinc-500"
                       {...field}
                     />
                   </FormControl>
@@ -186,9 +196,9 @@ export function LoginForm() {
           </form>
         </Form>
 
-        <p className="text-center text-sm text-neutral-500">
+        <p className="text-center text-sm text-zinc-500">
           Don&apos;t have an account?{" "}
-          <Link href="/signup" className="text-black underline">
+          <Link href="/signup" className="text-violet-300 underline">
             Sign up
           </Link>
         </p>

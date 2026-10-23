@@ -159,6 +159,12 @@ npx inngest-cli@latest dev
 
 ## Demo Flow
 
+The public root route (`/`) opens a standalone TaskOrbit demo workspace. Anyone
+can switch between the three example workflows, inspect each step, and download
+an importable `.taskorbit.json` file without signing in or entering ChatGPT.
+The signed-in workspace also offers these templates from the empty-workflows
+state.
+
 For a reliable project demonstration:
 
 1. Sign in and open the **Workflows** dashboard.
@@ -187,6 +193,31 @@ Before deploying a public instance:
 - Configure Polar only when billing is required.
 - Configure Sentry through environment variables if monitoring is required.
 - Keep all `.env` files and service credentials out of source control.
+
+### Vercel setup for accounts
+
+TaskOrbit uses Better Auth with email/password accounts and optional GitHub and
+Google OAuth. In the Vercel project settings, add the required server-side
+values before enabling sign-up:
+
+- `DATABASE_URL` — a production Neon PostgreSQL connection string.
+- `BETTER_AUTH_SECRET` — a random secret (for example,
+  `openssl rand -base64 32`).
+- `BETTER_AUTH_URL` — `https://taskorbit-mayank.vercel.app`.
+- `NEXT_PUBLIC_APP_URL` — `https://taskorbit-mayank.vercel.app`.
+
+Apply the committed Prisma migrations with `npx prisma migrate deploy` after
+connecting the database. To enable social login, add each provider's client ID
+and secret and register these callback URLs:
+
+- GitHub: `https://taskorbit-mayank.vercel.app/api/auth/callback/github`
+- Google: `https://taskorbit-mayank.vercel.app/api/auth/callback/google`
+
+GitHub and Google buttons appear only when their matching credentials are
+configured. Polar billing remains optional and is hidden until its credentials
+are configured. If the required database or auth values are missing, the login
+and signup pages show setup guidance, while the public demo workspace continues
+to work.
 
 ## Available Scripts
 

@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 
-import { requireAuth } from "@/lib/auth-utils";
 import prisma from "@/lib/db";
 import { CredentialForm } from "@/features/credentials/components/credential";
 
@@ -11,8 +10,6 @@ type Props = {
 };
 
 const Page = async ({ params }: Props) => {
-  await requireAuth();
-
   const { credentialId } = await params;
 
   const credential = await prisma.credential.findUnique({

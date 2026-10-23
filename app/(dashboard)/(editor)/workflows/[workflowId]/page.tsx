@@ -2,8 +2,6 @@ import { Suspense } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
 import { HydrateClient } from "@/trpc/server";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
 
 import { prefetchWorkflow } from "@/features/workflows/server/prefetch";
 
@@ -20,10 +18,6 @@ interface PageProps {
 }
 
 const Page = async ({ params }: PageProps) => {
-  await auth.api.getSession({
-    headers: await headers(),
-  });
-
   const { workflowId } = await params;
 
   prefetchWorkflow(workflowId);
