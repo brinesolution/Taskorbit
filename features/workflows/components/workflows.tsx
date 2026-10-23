@@ -17,7 +17,10 @@ import {
   ClockIcon,
   GitBranchIcon,
   UploadIcon,
+  ArrowRightIcon,
+  Loader2Icon,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { useWorkflowsParams } from "../hooks/use-workflows-params";
 import {
@@ -28,6 +31,7 @@ import {
 } from "../hooks/use-workflows";
 
 import { parseWorkflowFile } from "../import-format";
+import { workflowTemplates } from "../demo-templates";
 
 import {
   EntityHeader,
@@ -254,11 +258,106 @@ export const WorkflowsError = () => {
 
 export const WorkflowsEmpty = () => {
   const createWorkflow = useCreateWorkflow();
+  const importWorkflow = useImportWorkflow();
+  const router = useRouter();
+
+  const addTemplate = async (template: (typeof workflowTemplates)[number]) => {
+    try {
+      const created = await importWorkflow.mutateAsync({
+        format: template.format,
+        version: template.version,
+        name: template.name,
+        graph: template.graph,
+      });
+      toast.success(`${template.name} added to your workspace`);
+      router.push(`/workflows/${created.id}`);
+    } catch {
+      toast.error("Could not add this workflow. Please try again.");
+    }
+  };
 
   return (
-    <EmptyView
-      message="You haven't created any workflows yet. Get started by creating your first workflow"
-      onNew={() => createWorkflow.mutate()}
-    />
+    <div className="space-y-7">
+      <section className="rounded-2xl border border-purple-200 bg-white/80 p-6 shadow-lg shadow-purple-500/5 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/70">
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+              Start with a demo workflow
+            </h2>
+            <p className="mt-1 max-w-2xl text-sm text-slate-600 dark:text-zinc-400">
+              Add a ready-made flow to your workspace, inspect the steps, and connect your own service credentials.
+            </p>
+          </div>
+          <span className="text-xs text-slate-500 dark:text-zinc-500">
+            3 templates
+          </span>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-3">
+          {workflowTemplates.map((template) => {
+            const isAdding = importWorkflow.isPending;
+            return (
+              <article
+                key={template.name}
+                className="flex min-h-56 flex-col rounded-xl border border-slate-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950/70"
+              >
+                <div className="flex items-start gap-3">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-purple-100 text-purple-700 dark:bg-purple-500/15 dark:text-purple-300">
+                    <WorkflowIcon className="size-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="font-semibold text-slate-900 dark:text-zinc-100">
+                      {template.name}
+                    </h3>
+                    <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-zinc-400">
+                      {template.description}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-1.5">
+                  {template.integrations.map((integration) => (
+                    <span
+                      key={integration}
+                      className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] text-slate-600 dark:border-zinc-800 dark:text-zinc-400"
+                    >
+                      {integration}
+                    </span>
+                  ))}
+                </div>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-auto w-full justify-between border-slate-200 bg-transparent dark:border-zinc-700 dark:hover:bg-zinc-900"
+                  disabled={isAdding}
+                  onClick={() => void addTemplate(template)}
+                >
+                  {isAdding ? (
+                    <>
+                      <Loader2Icon className="mr-2 size-4 animate-spin" />
+                      Adding workflow...
+                    </>
+                  ) : (
+                    <>
+                      Use template
+                      <ArrowRightIcon className="size-4" />
+                    </>
+                  )}
+                </Button>
+              </article>
+            );
+          })}
+        </div>
+        <p className="mt-4 text-xs text-slate-500 dark:text-zinc-500">
+          Gemini, Discord, and WhatsApp steps need your own credentials before live execution.
+        </p>
+      </section>
+
+      <EmptyView
+        message="Or start with an empty canvas and build your own automation."
+        onNew={() => createWorkflow.mutate()}
+      />
+    </div>
   );
 };
