@@ -40,17 +40,30 @@ export const PlaceholderNode =
             w-auto
             h-auto
             border-dashed
-            border-gray-400
+            border-muted-foreground
             bg-card
             p-4
             text-center
-            text-gray-400
+            text-muted-foreground
             shadow-none
             cursor-pointer
-            hover:border-gray-500
-            hover:bg-gray-50
+            hover:border-primary/60
+            hover:bg-muted
+            focus-visible:outline-none
+            focus-visible:ring-2
+            focus-visible:ring-ring
+            focus-visible:ring-offset-2
+            focus-visible:ring-offset-background
           "
+          role={onClick ? "button" : undefined}
+          aria-label={onClick ? "Add the first workflow step" : undefined}
+          tabIndex={onClick ? 0 : undefined}
           onClick={onClick}
+          onKeyDown={(event) => {
+            if (!onClick || (event.key !== "Enter" && event.key !== " ")) return;
+            event.preventDefault();
+            onClick();
+          }}
         >
           <div className="flex flex-col items-center justify-center gap-2">
             {children}

@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import { ErrorBoundary } from "react-error-boundary";
 
 import { HydrateClient } from "@/trpc/server";
 
@@ -7,8 +6,8 @@ import { prefetchWorkflow } from "@/features/workflows/server/prefetch";
 
 import {
   Editor,
+  EditorErrorBoundary,
   EditorLoading,
-  EditorError,
 } from "@/features/editor/components/editor";
 
 interface PageProps {
@@ -24,11 +23,11 @@ const Page = async ({ params }: PageProps) => {
 
   return (
     <HydrateClient>
-      <ErrorBoundary fallback={<EditorError />}>
+      <EditorErrorBoundary>
         <Suspense fallback={<EditorLoading />}>
           <Editor workflowId={workflowId} />
         </Suspense>
-      </ErrorBoundary>
+      </EditorErrorBoundary>
     </HydrateClient>
   );
 };

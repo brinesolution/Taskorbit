@@ -2,7 +2,6 @@
 
 import { nanoid } from "nanoid";
 import {
-  BotIcon,
   FileTextIcon,
   GlobeIcon,
   MousePointerClickIcon,
@@ -20,11 +19,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-
-import {
-  Card,
-  CardContent,
-} from "@/components/ui/card";
 
 import { editorAtom } from "@/features/editor/store/atoms";
 
@@ -108,18 +102,27 @@ export const NodeSelector = ({
     const newNode: Node = {
       id: nanoid(),
       type,
-      position: {
-        x: Math.random() * 300,
-        y: Math.random() * 300,
-      },
+      position: { x: 0, y: 0 },
       data: {},
     };
 
-    setEditor((editor) => {
-      if (!editor) return editor;
+    setEditor((currentEditor) => {
+      if (!currentEditor) return currentEditor;
 
-      editor.addNodes(newNode);
-      return editor;
+      const flowElement = document.querySelector<HTMLElement>(".react-flow");
+      const bounds = flowElement?.getBoundingClientRect();
+      const center = bounds
+        ? {
+            x: bounds.left + bounds.width / 2,
+            y: bounds.top + bounds.height / 2,
+          }
+        : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+
+      currentEditor.addNodes({
+        ...newNode,
+        position: currentEditor.screenToFlowPosition(center),
+      });
+      return currentEditor;
     });
 
     onOpenChange(false);
@@ -137,24 +140,23 @@ export const NodeSelector = ({
             const Icon = option.icon;
 
             return (
-              <Card
+              <button
                 key={option.type}
-                className="cursor-pointer transition hover:bg-muted"
+                type="button"
+                className="group flex w-full items-center gap-3 rounded-xl bg-card p-4 text-left text-card-foreground ring-1 ring-foreground/10 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 onClick={() => handleAddNode(option.type)}
               >
-                <CardContent className="flex items-center gap-3 p-4">
-                  <div className="flex size-10 items-center justify-center rounded-md bg-muted">
-                    <Icon className="size-5" />
-                  </div>
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground">
+                  <Icon aria-hidden="true" className="size-5" />
+                </span>
 
-                  <div>
-                    <p className="font-medium">{option.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {option.description}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+                <span className="min-w-0">
+                  <span className="block font-medium">{option.name}</span>
+                  <span className="block text-sm text-muted-foreground">
+                    {option.description}
+                  </span>
+                </span>
+              </button>
             );
           })}
         </div>

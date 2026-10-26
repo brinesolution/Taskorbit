@@ -31,23 +31,31 @@ export function WorkflowNode({
 }: WorkflowNodeProps) {
   return (
     <>
-      {showToolbar && (
+      {showToolbar && (onSettings || onDelete) && (
         <NodeToolbar>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={onSettings}
-          >
-            <SettingsIcon className="size-4" />
-          </Button>
+          {onSettings && (
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-label={`Configure ${name ?? "workflow step"}`}
+              title={`Configure ${name ?? "workflow step"}`}
+              onClick={onSettings}
+            >
+              <SettingsIcon aria-hidden="true" className="size-4" />
+            </Button>
+          )}
 
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={onDelete}
-          >
-            <TrashIcon className="size-4" />
-          </Button>
+          {onDelete && (
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-label={`Delete ${name ?? "workflow step"}`}
+              title={`Delete ${name ?? "workflow step"}`}
+              onClick={onDelete}
+            >
+              <TrashIcon aria-hidden="true" className="size-4" />
+            </Button>
+          )}
         </NodeToolbar>
       )}
 

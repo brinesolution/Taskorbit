@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { ErrorBoundary } from "react-error-boundary";
+import { QueryErrorResetBoundary } from "@tanstack/react-query";
 import {
   ReactFlow,
   Background,
@@ -54,9 +56,33 @@ export const EditorLoading = () => {
   return <LoadingView message="Loading workflow..." />;
 };
 
-export const EditorError = () => {
-  return <ErrorView message="Error loading workflow" />;
+export const EditorError = ({ onRetry }: { onRetry: () => void }) => {
+  return (
+    <ErrorView
+      message="This workflow could not load. Check your connection and try again."
+      onRetry={onRetry}
+    />
+  );
 };
+
+export const EditorErrorBoundary = ({
+  children,
+}: {
+  children: React.ReactNode;
+}) => (
+  <QueryErrorResetBoundary>
+    {({ reset }) => (
+      <ErrorBoundary
+        onReset={reset}
+        fallbackRender={({ resetErrorBoundary }) => (
+          <EditorError onRetry={resetErrorBoundary} />
+        )}
+      >
+        {children}
+      </ErrorBoundary>
+    )}
+  </QueryErrorResetBoundary>
+);
 
 export const Editor = ({
   workflowId,

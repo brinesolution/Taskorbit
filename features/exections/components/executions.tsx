@@ -2,7 +2,10 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { SearchIcon } from "lucide-react";
+import { ErrorBoundary } from "react-error-boundary";
+import { QueryErrorResetBoundary } from "@tanstack/react-query";
+import { AlertTriangleIcon, Loader2Icon, SearchIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 import { useSuspenseExecutions } from "../hooks/use-executions";
 import { useExecutionsParams } from "../hooks/use-executions-params";
@@ -23,8 +26,13 @@ export const ExecutionsContainer = ({
   children: ReactNode;
 }) => {
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold">Executions</h1>
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div>
+        <h1 className="text-2xl font-bold">Executions</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Review the latest workflow runs and their outcomes.
+        </p>
+      </div>
       <div className="mt-6">{children}</div>
     </div>
   );
@@ -53,7 +61,7 @@ export const ExecutionsList = () => {
         </label>
         <select
           aria-label="Filter executions by status"
-          className="h-11 rounded-xl border bg-background px-3 text-sm"
+          className="h-11 w-full rounded-xl border border-input bg-input/40 px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:w-auto"
           value={params.status}
           onChange={(event) => {
             const status = normalizeExecutionStatus(event.target.value);
@@ -112,9 +120,55 @@ export const ExecutionsList = () => {
 };
 
 export const ExecutionsLoading = () => {
-  return <div>Loading...</div>;
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="flex min-h-56 flex-col items-center justify-center gap-3 rounded-2xl border border-border bg-card/60 text-muted-foreground"
+    >
+      <Loader2Icon className="size-5 animate-spin text-primary" aria-hidden="true" />
+      <span className="text-sm">Loading executions…</span>
+    </div>
+  );
 };
 
-export const ExecutionsError = () => {
-  return <div>Error</div>;
+export const ExecutionsError = ({ onRetry }: { onRetry: () => void }) => {
+  return (
+    <div
+      role="alert"
+      className="flex min-h-56 flex-col items-center justify-center gap-3 rounded-2xl border border-destructive/30 bg-card/60 px-5 text-center"
+    >
+      <span className="flex size-10 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+        <AlertTriangleIcon className="size-5" aria-hidden="true" />
+      </span>
+      <div>
+        <p className="font-medium text-foreground">Executions could not load</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Check your connection, then try again.
+        </p>
+      </div>
+      <Button variant="outline" onClick={onRetry}>
+        Try again
+      </Button>
+    </div>
+  );
 };
+
+export const ExecutionsErrorBoundary = ({
+  children,
+}: {
+  children: ReactNode;
+}) => (
+  <QueryErrorResetBoundary>
+    {({ reset }) => (
+      <ErrorBoundary
+        onReset={reset}
+        fallbackRender={({ resetErrorBoundary }) => (
+          <ExecutionsError onRetry={resetErrorBoundary} />
+        )}
+      >
+        {children}
+      </ErrorBoundary>
+    )}
+  </QueryErrorResetBoundary>
+);
