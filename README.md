@@ -15,7 +15,7 @@ A full-stack workflow automation platform for designing, running, and monitoring
 
 TaskOrbit combines a drag-and-drop workflow editor with an event-driven execution engine. Users can create workflows, connect triggers to actions, store service credentials, execute automations, and inspect execution history from one dashboard.
 
-The project is designed as a portfolio-ready demonstration of modern full-stack architecture using Next.js, tRPC, Prisma, PostgreSQL, Inngest, and React Flow.
+TaskOrbit is a workflow automation application built with Next.js, tRPC, Prisma, PostgreSQL, Inngest, and React Flow.
 
 ## Core Features
 
@@ -119,7 +119,7 @@ On Windows PowerShell:
 Copy-Item .env.example .env
 ```
 
-At minimum, configure `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, and `NEXT_PUBLIC_APP_URL`. OAuth, billing, hosted Inngest, and Sentry values are optional unless those features are being demonstrated.
+At minimum, configure `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, and `NEXT_PUBLIC_APP_URL` for accounts. Configure `CREDENTIALS_ENCRYPTION_KEY` to store encrypted service credentials; generate a base64-encoded 32-byte key with `openssl rand -base64 32`. OAuth, billing, hosted Inngest, and Sentry values are optional unless you use those features.
 
 External action credentials such as Gemini, Discord, and WhatsApp credentials are managed through TaskOrbit's credential interface rather than committed to the repository.
 
@@ -157,25 +157,23 @@ In a second terminal:
 npx inngest-cli@latest dev
 ```
 
-## Demo Flow
+## Get Started
 
-The public root route (`/`) opens a standalone TaskOrbit demo workspace. Anyone
-can switch between the three example workflows, inspect each step, and download
-an importable `.taskorbit.json` file without signing in or entering ChatGPT.
-The signed-in workspace also offers these templates from the empty-workflows
-state.
+Open TaskOrbit at `/`. The public landing page links to **Sign in** and
+**Create account**. After signing in, TaskOrbit opens your **Workflows** list.
+New accounts can start with a workflow template from the empty state or create
+an empty workflow. Templates are copied into your account only when you choose
+**Use template**; they contain no personal service credentials.
 
-For a reliable project demonstration:
+To build and run a workflow:
 
-1. Sign in and open the **Workflows** dashboard.
-2. Create a new workflow.
-3. Add a **Manual Trigger**.
-4. Connect it to an **HTTP Request** action for a credential-free demonstration.
-5. Save and execute the workflow.
-6. Open **Executions** to show execution state and logs.
-7. For an extended demo, add Gemini, Discord, WhatsApp, Google Forms, or Stripe after configuring the corresponding credentials.
+1. Create a workflow or choose a template.
+2. Add a trigger and the actions you need in the visual editor.
+3. Configure service credentials under **Credentials** when an action requires them.
+4. Save and execute the workflow.
+5. Open **Executions** to inspect status and output.
 
-A concise presentation sequence is:
+A concise workflow sequence is:
 
 ```text
 Create Workflow -> Add Trigger -> Add Action -> Connect Nodes -> Execute -> Inspect Result
@@ -187,6 +185,7 @@ Before deploying a public instance:
 
 - Use a production PostgreSQL database.
 - Set a strong `BETTER_AUTH_SECRET`.
+- Set `CREDENTIALS_ENCRYPTION_KEY` to a base64-encoded 32-byte key before storing service credentials. Keep the key private and back it up securely; credentials encrypted with a different key cannot be decrypted.
 - Configure the public application URL.
 - Configure OAuth redirect URLs for the production domain.
 - Set hosted Inngest keys if background jobs run outside local development.
@@ -198,26 +197,27 @@ Before deploying a public instance:
 
 TaskOrbit uses Better Auth with email/password accounts and optional GitHub and
 Google OAuth. In the Vercel project settings, add the required server-side
-values before enabling sign-up:
+values for the features you enable:
 
 - `DATABASE_URL` — a production Neon PostgreSQL connection string.
+- `CREDENTIALS_ENCRYPTION_KEY` - a private base64-encoded 32-byte key used to encrypt stored service credentials (generate with `openssl rand -base64 32`).
 - `BETTER_AUTH_SECRET` — a random secret (for example,
   `openssl rand -base64 32`).
-- `BETTER_AUTH_URL` — `https://taskorbit-mayank.vercel.app`.
-- `NEXT_PUBLIC_APP_URL` — `https://taskorbit-mayank.vercel.app`.
+- `BETTER_AUTH_URL` — `https://taskorbit-mayank-nu.vercel.app`.
+- `NEXT_PUBLIC_APP_URL` — `https://taskorbit-mayank-nu.vercel.app`.
 
 Apply the committed Prisma migrations with `npx prisma migrate deploy` after
 connecting the database. To enable social login, add each provider's client ID
 and secret and register these callback URLs:
 
-- GitHub: `https://taskorbit-mayank.vercel.app/api/auth/callback/github`
-- Google: `https://taskorbit-mayank.vercel.app/api/auth/callback/google`
+- GitHub: `https://taskorbit-mayank-nu.vercel.app/api/auth/callback/github`
+- Google: `https://taskorbit-mayank-nu.vercel.app/api/auth/callback/google`
 
 GitHub and Google buttons appear only when their matching credentials are
 configured. Polar billing remains optional and is hidden until its credentials
 are configured. If the required database or auth values are missing, the login
-and signup pages show setup guidance, while the public demo workspace continues
-to work.
+and signup pages show setup guidance; account creation and workflow access
+become available after setup is complete.
 
 ## Available Scripts
 
@@ -247,4 +247,4 @@ TaskOrbit is currently owned and maintained in this repository by **Mayank Lohan
 
 ## Repository Status
 
-This repository is maintained as a full-stack project and demonstration build. Service-dependent features require their corresponding third-party credentials and accounts.
+This repository contains the TaskOrbit workflow automation application. Service-dependent features require their corresponding third-party credentials and accounts.

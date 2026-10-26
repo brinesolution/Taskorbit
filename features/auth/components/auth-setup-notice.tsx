@@ -20,8 +20,8 @@ export function AuthSetupNotice({ missing }: { missing: string[] }) {
           Sign-in is being set up
         </CardTitle>
         <CardDescription className="text-zinc-400">
-          The demo workspace is public. Account sign-in becomes available after
-          the production database and auth settings are connected.
+          Account sign-in is unavailable until the production database and
+          authentication settings are connected.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -45,7 +45,7 @@ export function AuthSetupNotice({ missing }: { missing: string[] }) {
           href="/"
           className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-violet-500 px-4 text-sm font-medium text-white transition hover:bg-violet-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300"
         >
-          Explore the demo workspace
+          Back to TaskOrbit home
         </Link>
       </CardContent>
     </Card>

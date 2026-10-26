@@ -343,6 +343,14 @@ const edges: Edge[] = workflow.connections.map(
           orderBy: {
             updatedAt: "desc",
           },
+          include: {
+            nodes: { select: { id: true } },
+            executions: {
+              take: 1,
+              orderBy: { startedAt: "desc" },
+              select: { status: true, startedAt: true },
+            },
+          },
         }),
 
         prisma.workflow.count({
@@ -357,7 +365,11 @@ const edges: Edge[] = workflow.connections.map(
       ]);
 
       return {
-        items,
+        items: items.map(({ nodes, executions, ...workflow }) => ({
+          ...workflow,
+          nodeCount: nodes.length,
+          latestExecution: executions[0] ?? null,
+        })),
         totalCount,
         page,
         pageSize,

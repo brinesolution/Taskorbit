@@ -20,13 +20,20 @@ const DEFAULT_PARAMS = {
 export const useSuspenseWorkflows = () => {
   const trpc = useTRPC();
   const [params] = useWorkflowsParams();
+  const queryOptions = trpc.workflows.getMany.queryOptions({
+    ...DEFAULT_PARAMS,
+    ...params,
+  });
 
-  return useSuspenseQuery(
-    trpc.workflows.getMany.queryOptions({
-      ...DEFAULT_PARAMS,
-      ...params,
-    })
-  );
+  return useSuspenseQuery({
+    ...queryOptions,
+    refetchInterval: (query) =>
+      query.state.data?.items.some(
+        (workflow) => workflow.latestExecution?.status === "RUNNING",
+      )
+        ? 2_000
+        : false,
+  });
 };
 
 export const useCreateWorkflow = () => {
@@ -136,9 +143,9 @@ export const useExecuteWorkflow = () => {
 
   return useMutation(
     trpc.workflows.execute.mutationOptions({
-      onSuccess: () => {
-        queryClient.invalidateQueries(
-          trpc.workflows.getMany.queryOptions({})
+      onSuccess: async () => {
+        await queryClient.invalidateQueries(
+          trpc.workflows.getMany.queryFilter(),
         );
       },
     })
