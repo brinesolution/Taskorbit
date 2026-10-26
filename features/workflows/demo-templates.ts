@@ -121,8 +121,8 @@ export const workflowTemplates: WorkflowTemplate[] = [
     version: 1,
     name: "Project activity digest",
     description:
-      "Fetch public repository details, generate a short digest, then share it with the team.",
-    integrations: ["Manual Trigger", "HTTP Request", "Gemini", "Discord"],
+      "Fetch public GitHub repository info without GitHub credentials, summarize it with Gemini, then post it to Discord. Select your own Gemini and Discord credentials when configuring the nodes.",
+    integrations: ["Manual Trigger", "GitHub public API", "Gemini", "Discord"],
     graph: {
       nodes: [
         {
@@ -147,7 +147,7 @@ export const workflowTemplates: WorkflowTemplate[] = [
           position: { x: 560, y: 120 },
           data: {
             variableName: "projectDigest",
-            model: "gemini-2.0-flash",
+            provider: "google",
             systemPrompt:
               "You write concise project updates for an engineering team.",
             userPrompt:
@@ -160,7 +160,6 @@ export const workflowTemplates: WorkflowTemplate[] = [
           position: { x: 840, y: 120 },
           data: {
             variableName: "digestMessage",
-            webhookUrl: "",
             content: "Project activity digest: {{projectDigest.text}}",
             username: "TaskOrbit",
           },
