@@ -41,6 +41,7 @@ const credentialTypes = [
   "GEMINI",
   "DISCORD",
   "WHATSAPP",
+  "TELEGRAM",
   "STRIPE",
 ] as const;
 
@@ -187,6 +188,7 @@ export const CredentialForm = ({ initialData }: CredentialFormProps) => {
                       <SelectItem value="GEMINI">Gemini</SelectItem>
                       <SelectItem value="DISCORD">Discord</SelectItem>
                       <SelectItem value="WHATSAPP">WhatsApp</SelectItem>
+                      <SelectItem value="TELEGRAM">Telegram</SelectItem>
                       <SelectItem value="STRIPE">Stripe</SelectItem>
                     </SelectContent>
                   </Select>

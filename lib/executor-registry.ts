@@ -10,6 +10,7 @@ import { httpRequestExecutor } from "@/features/exections/components/executor";
 import { geminiExecutor } from "@/features/exections/components/gemini/executor";
 import { discordExecutor } from "@/features/exections/components/discord/executor";
 import { whatsappExecutor } from "@/features/exections/components/whatsapp/executor";
+import { telegramExecutor } from "@/features/exections/components/telegram/executor";
 
 export const executorRegistry: Partial<
   Record<NodeType, NodeExecutor>
@@ -23,6 +24,7 @@ export const executorRegistry: Partial<
   [NodeType.GEMINI]: geminiExecutor,
   [NodeType.DISCORD]: discordExecutor,
   [NodeType.WHATSAPP]: whatsappExecutor,
+  [NodeType.TELEGRAM]: telegramExecutor,
 };
 
 export const getExecutor = (

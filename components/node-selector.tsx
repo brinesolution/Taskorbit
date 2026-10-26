@@ -8,6 +8,7 @@ import {
   SendIcon,
   SparklesIcon,
   MessageCircleIcon,
+  SendHorizontalIcon,
   CreditCardIcon,
 } from "lucide-react";
 import { useSetAtom } from "jotai";
@@ -30,6 +31,7 @@ const NodeType = {
   GEMINI: "GEMINI",
   DISCORD: "DISCORD",
   WHATSAPP: "WHATSAPP",
+  TELEGRAM: "TELEGRAM",
 } as const;
 
 type NodeTypeValue =
@@ -84,6 +86,12 @@ const nodeOptions: NodeOption[] = [
     name: "WhatsApp",
     description: "Send WhatsApp message",
     icon: MessageCircleIcon,
+  },
+  {
+    type: NodeType.TELEGRAM,
+    name: "Telegram",
+    description: "Send a Telegram message",
+    icon: SendHorizontalIcon,
   },
 ];
 

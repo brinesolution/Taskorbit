@@ -153,6 +153,7 @@ enum CredentialType {
   GEMINI
   DISCORD
   WHATSAPP
+  TELEGRAM
   STRIPE
 }
 
@@ -167,6 +168,7 @@ enum NodeType {
   DISCORD
   SLACK
   WHATSAPP
+  TELEGRAM
 }
 
 model Node {

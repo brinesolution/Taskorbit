@@ -11,6 +11,7 @@ import { googleFormTriggerChannel } from "./channels/google-form-trigger";
 import { stripeTriggerChannel } from "./channels/stripe-trigger";
 import { geminiChannel } from "./channels/gemini";
 import { discordChannel } from "./channels/discord";
+import { telegramChannel } from "./channels/telegram";
 
 const NodeType = {
   INITIAL: "INITIAL",
@@ -21,6 +22,7 @@ const NodeType = {
   GEMINI: "GEMINI",
   DISCORD: "DISCORD",
   WHATSAPP: "WHATSAPP",
+  TELEGRAM: "TELEGRAM",
 } as const;
 
 type NodeTypeValue =
@@ -40,6 +42,7 @@ export const executeWorkflow = inngest.createFunction(
       stripeTriggerChannel(),
       geminiChannel(),
       discordChannel(),
+      telegramChannel(),
     ],
   },
   async ({ event, step, publish }) => {
@@ -74,6 +77,15 @@ export const executeWorkflow = inngest.createFunction(
 
         const sortedNodes = topologicalSort(workflow.nodes, workflow.connections);
         const nodes = sortedNodes.map((node: any) => {
+          if (node.type === "TELEGRAM") {
+            const storedData = (node.data as Record<string, unknown>) ?? {};
+            const data = Object.fromEntries(
+              ["credentialId", "chatId", "text", "variableName"]
+                .filter((key) => typeof storedData[key] === "string")
+                .map((key) => [key, storedData[key]])
+            );
+            return { ...node, data };
+          }
           if (node.type !== "DISCORD") return node;
           const data = { ...((node.data as Record<string, unknown>) ?? {}) };
           const hasLegacyWebhook = typeof data.webhookUrl === "string" && data.webhookUrl.length > 0;
