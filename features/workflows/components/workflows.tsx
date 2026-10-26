@@ -51,7 +51,6 @@ import {
   EntitySearch,
   LoadingView,
   ErrorView,
-  EmptyView,
   EntityList,
 } from "./entity-components";
 
@@ -516,10 +515,48 @@ export const WorkflowsEmpty = () => {
         </p>
       </section>
 
-      <EmptyView
-        message="Or start with an empty canvas and build your own automation."
-        onNew={() => createWorkflow.mutate()}
-      />
+      <section
+        aria-labelledby="build-workflow-title"
+        className="flex flex-col gap-4 rounded-xl border border-zinc-800 bg-zinc-950/70 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6"
+      >
+        <div className="flex min-w-0 items-start gap-3">
+          <span
+            aria-hidden="true"
+            className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-purple-500/15 text-purple-300"
+          >
+            <WorkflowIcon className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <h2 id="build-workflow-title" className="font-semibold text-zinc-100">
+              Build from scratch
+            </h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-zinc-400">
+              Start with an empty canvas and shape an automation around your own steps.
+            </p>
+          </div>
+        </div>
+        <Button
+          type="button"
+          className="taskorbit-button w-full shrink-0 sm:w-auto"
+          disabled={createWorkflow.isPending}
+          aria-busy={createWorkflow.isPending}
+          onClick={() =>
+            createWorkflow.mutate(undefined, {
+              onError: (error) =>
+                toast.error(error.message || "Could not create workflow."),
+            })
+          }
+        >
+          {createWorkflow.isPending ? (
+            <>
+              <Loader2Icon className="mr-2 size-4 animate-spin" />
+              Creating workflow...
+            </>
+          ) : (
+            "Create workflow"
+          )}
+        </Button>
+      </section>
     </div>
   );
 };
