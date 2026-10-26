@@ -17,22 +17,45 @@ const DEFAULT_PARAMS = {
   search: "",
 };
 
-export const useSuspenseWorkflows = () => {
+export const WORKFLOW_RUN_DISCOVERY_TIMEOUT_MS = 60_000;
+export const WORKFLOW_RUN_STATUS_TIMEOUT_MS = 10 * 60_000;
+
+export type QueuedWorkflowRun = {
+  workflowId: string;
+  eventId: string;
+  queuedAt: number;
+  discoveredAt?: number;
+};
+
+export const useSuspenseWorkflows = (queuedRuns: QueuedWorkflowRun[] = []) => {
   const trpc = useTRPC();
   const [params] = useWorkflowsParams();
   const queryOptions = trpc.workflows.getMany.queryOptions({
     ...DEFAULT_PARAMS,
     ...params,
+    ...(queuedRuns.length > 0
+      ? { pendingEventIds: queuedRuns.map((run) => run.eventId) }
+      : {}),
   });
 
   return useSuspenseQuery({
     ...queryOptions,
-    refetchInterval: (query) =>
-      query.state.data?.items.some(
-        (workflow) => workflow.latestExecution?.status === "RUNNING",
-      )
-        ? 2_000
-        : false,
+    refetchInterval: (query) => {
+      const waitingForQueuedExecution = queuedRuns.some((run) => {
+        const execution = query.state.data?.pendingExecutions.find(
+          (pending) => pending.inngestEventId === run.eventId,
+        );
+        if (execution && execution.status !== "RUNNING") return false;
+
+        const startedAt = run.discoveredAt ?? run.queuedAt;
+        const timeout = run.discoveredAt
+          ? WORKFLOW_RUN_STATUS_TIMEOUT_MS
+          : WORKFLOW_RUN_DISCOVERY_TIMEOUT_MS;
+        return Date.now() - startedAt < timeout;
+      });
+
+      return waitingForQueuedExecution ? 2_000 : false;
+    },
   });
 };
 

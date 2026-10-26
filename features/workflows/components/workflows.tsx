@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { MAX_PENDING_WORKFLOW_RUNS } from "../constants";
 import { useWorkflowsParams } from "../hooks/use-workflows-params";
 import {
   useCreateWorkflow,
@@ -30,6 +31,11 @@ import {
   useImportWorkflow,
   useRemoveWorkflow,
   useSuspenseWorkflows,
+} from "../hooks/use-workflows";
+import {
+  type QueuedWorkflowRun,
+  WORKFLOW_RUN_DISCOVERY_TIMEOUT_MS,
+  WORKFLOW_RUN_STATUS_TIMEOUT_MS,
 } from "../hooks/use-workflows";
 
 import { parseWorkflowFile } from "../import-format";
@@ -55,6 +61,7 @@ type WorkflowItem = {
   createdAt: Date | string;
   updatedAt: Date | string;
   nodeCount: number;
+  hasManualTrigger: boolean;
   latestExecution: {
     status: "RUNNING" | "SUCCESS" | "FAILED";
     startedAt: Date | string;
@@ -80,11 +87,75 @@ export const WorkflowsSearch = () => {
 };
 
 export const WorkflowsList = () => {
+  const [queuedRuns, setQueuedRuns] = useState<QueuedWorkflowRun[]>([]);
+  const activeRunIdsRef = useRef(new Set<string>());
+  const [activeRunCount, setActiveRunCount] = useState(0);
   const removeWorkflow = useRemoveWorkflow();
   const executeWorkflow = useExecuteWorkflow();
-  const workflows = useSuspenseWorkflows();
+  const workflows = useSuspenseWorkflows(queuedRuns);
   const items = workflows.data.items as WorkflowItem[];
 
+  useEffect(() => {
+    if (queuedRuns.length === 0) return;
+
+    const observedExecutions = workflows.data.pendingExecutions;
+    const terminalRuns = queuedRuns.filter((run) =>
+      observedExecutions.some(
+        (execution) =>
+          execution.inngestEventId === run.eventId &&
+          execution.status !== "RUNNING",
+      ),
+    );
+    if (terminalRuns.length > 0) {
+      terminalRuns.forEach((run) => activeRunIdsRef.current.delete(run.workflowId));
+      setActiveRunCount(activeRunIdsRef.current.size);
+      const terminalEventIds = new Set(terminalRuns.map((run) => run.eventId));
+      setQueuedRuns((current) =>
+        current.filter((run) => !terminalEventIds.has(run.eventId)),
+      );
+    }
+
+    setQueuedRuns((current) => {
+      let changed = false;
+      const updated = current.map((run) => {
+        const execution = observedExecutions.find(
+          (item) => item.inngestEventId === run.eventId,
+        );
+        if (execution?.status === "RUNNING" && !run.discoveredAt) {
+          changed = true;
+          return { ...run, discoveredAt: Date.now() };
+        }
+        return run;
+      });
+      return changed ? updated : current;
+    });
+  }, [queuedRuns, workflows.data.pendingExecutions]);
+
+  useEffect(() => {
+    if (queuedRuns.length === 0) return;
+
+    const timers = queuedRuns.map((run) => {
+      const timeout = run.discoveredAt
+        ? WORKFLOW_RUN_STATUS_TIMEOUT_MS
+        : WORKFLOW_RUN_DISCOVERY_TIMEOUT_MS;
+      const start = run.discoveredAt ?? run.queuedAt;
+
+      return window.setTimeout(() => {
+        activeRunIdsRef.current.delete(run.workflowId);
+        setActiveRunCount(activeRunIdsRef.current.size);
+        setQueuedRuns((current) =>
+          current.filter((item) => item.eventId !== run.eventId),
+        );
+        toast.warning(
+          run.discoveredAt
+            ? "Run status tracking timed out. Check Executions for the latest status."
+            : "No execution record appeared yet. Check Executions before retrying.",
+        );
+      }, Math.max(0, timeout - (Date.now() - start)));
+    });
+
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [queuedRuns]);
   if (items.length === 0) {
     return <WorkflowsEmpty />;
   }
@@ -94,6 +165,20 @@ export const WorkflowsList = () => {
       {items.map((workflow) => {
         const isExecuting =
           executeWorkflow.isPending && executeWorkflow.variables?.id === workflow.id;
+        const queuedRun = queuedRuns.find(
+          (run) => run.workflowId === workflow.id,
+        );
+        const queuedExecution = queuedRun
+          ? workflows.data.pendingExecutions.find(
+              (execution) => execution.inngestEventId === queuedRun.eventId,
+            )
+          : undefined;
+        const runLimitReached = activeRunCount >= MAX_PENDING_WORKFLOW_RUNS;
+        const runDisabled =
+          !workflow.hasManualTrigger ||
+          executeWorkflow.isPending ||
+          Boolean(queuedRun) ||
+          runLimitReached;
         const executionLabel = workflow.latestExecution
           ? workflow.latestExecution.status === "SUCCESS"
             ? "Succeeded"
@@ -141,24 +226,69 @@ export const WorkflowsList = () => {
                 type="button"
                 size="sm"
                 className="taskorbit-button"
-                disabled={executeWorkflow.isPending}
-                onClick={() =>
+                disabled={runDisabled}
+                title={
+                  !workflow.hasManualTrigger
+                    ? "Add a Manual Trigger to run this workflow from the list."
+                    : runLimitReached
+                      ? `Wait for a tracked run to finish. The limit is ${MAX_PENDING_WORKFLOW_RUNS}.`
+                      : undefined
+                }
+                onClick={() => {
+                  if (activeRunIdsRef.current.has(workflow.id)) return;
+                  if (activeRunIdsRef.current.size >= MAX_PENDING_WORKFLOW_RUNS) {
+                    toast.warning(
+                      `Wait for a tracked run to finish. The limit is ${MAX_PENDING_WORKFLOW_RUNS}.`,
+                    );
+                    return;
+                  }
+
+                  activeRunIdsRef.current.add(workflow.id);
+                  setActiveRunCount(activeRunIdsRef.current.size);
                   executeWorkflow.mutate(
                     { id: workflow.id },
                     {
-                      onSuccess: () => toast.success("Workflow run queued."),
-                      onError: (error) => toast.error(error.message || "Could not run workflow."),
+                      onSuccess: ({ eventId }) => {
+                        setQueuedRuns((current) => [
+                          ...current.filter((run) => run.workflowId !== workflow.id),
+                          { workflowId: workflow.id, eventId, queuedAt: Date.now() },
+                        ]);
+                        toast.success("Run queued. Waiting for its execution record.");
+                      },
+                      onError: (error) => {
+                        activeRunIdsRef.current.delete(workflow.id);
+                        setActiveRunCount(activeRunIdsRef.current.size);
+                        toast.error(error.message || "Could not run workflow.");
+                      },
                     },
-                  )
-                }
+                  );
+                }}
               >
-                {isExecuting ? (
+                {queuedRun ? (
+                  <Loader2Icon className="mr-1 size-4 animate-spin" />
+                ) : isExecuting ? (
                   <Loader2Icon className="mr-1 size-4 animate-spin" />
                 ) : (
                   <PlayIcon className="mr-1 size-4" />
                 )}
-                {isExecuting ? "Starting…" : "Run"}
+                {queuedRun
+                  ? queuedExecution
+                    ? "Running…"
+                    : "Queued…"
+                  : isExecuting
+                    ? "Starting…"
+                    : "Run"}
               </Button>
+              {!workflow.hasManualTrigger && (
+                <span className="max-w-48 text-xs text-muted-foreground">
+                  Add a Manual Trigger to run from this list.
+                </span>
+              )}
+              {workflow.hasManualTrigger && runLimitReached && !queuedRun && (
+                <span role="status" className="max-w-52 text-xs text-muted-foreground">
+                  {MAX_PENDING_WORKFLOW_RUNS} runs are being tracked. Wait for one to finish.
+                </span>
+              )}
 
               <DropdownMenu>
                 <DropdownMenuTrigger

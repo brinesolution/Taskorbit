@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import type { Node, Edge } from "@xyflow/react";
 import { generateSlug } from "random-word-slugs";
 import { randomUUID } from "node:crypto";
@@ -7,6 +8,7 @@ import {
   stripCredentialReferences,
   workflowImportSchema,
 } from "../import-format";
+import { MAX_PENDING_WORKFLOW_RUNS } from "../constants";
 const NodeType = {
   INITIAL: "INITIAL",
   MANUAL_TRIGGER: "MANUAL_TRIGGER",
@@ -80,18 +82,33 @@ export const workflowsRouter = createTRPCRouter({
           },
         });
 
+      const manualTrigger = await prisma.node.findFirst({
+        where: { workflowId: workflow.id, type: "MANUAL_TRIGGER" },
+        select: { id: true },
+      });
+      if (!manualTrigger) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Add a Manual Trigger to run this workflow manually.",
+        });
+      }
+
       console.log("EXECUTING WORKFLOW:", workflow.id);
 
-      await inngest.send({
+      const { ids } = await inngest.send({
         name: "workflows/execute.workflow",
         data: {
           workflowId: workflow.id,
         },
       });
 
+      const eventId = ids[0];
+      if (!eventId) throw new Error("Workflow run could not be queued.");
+
       return {
         success: true,
         workflowId: workflow.id,
+        eventId,
       };
     }),
 
@@ -324,10 +341,14 @@ const edges: Edge[] = workflow.connections.map(
           .number()
           .default(PAGINATION.DEFAULT_PAGE_SIZE),
         search: z.string().default(""),
+        pendingEventIds: z
+          .array(z.string())
+          .max(MAX_PENDING_WORKFLOW_RUNS)
+          .default([]),
       })
     )
     .query(async ({ ctx, input }) => {
-      const { page, pageSize, search } = input;
+      const { page, pageSize, search, pendingEventIds } = input;
 
       const [items, totalCount] = await Promise.all([
         prisma.workflow.findMany({
@@ -344,7 +365,7 @@ const edges: Edge[] = workflow.connections.map(
             updatedAt: "desc",
           },
           include: {
-            nodes: { select: { id: true } },
+            nodes: { select: { type: true } },
             executions: {
               take: 1,
               orderBy: { startedAt: "desc" },
@@ -364,12 +385,27 @@ const edges: Edge[] = workflow.connections.map(
         }),
       ]);
 
+      const pendingExecutions = pendingEventIds.length
+        ? await prisma.execution.findMany({
+            where: {
+              inngestEventId: { in: pendingEventIds },
+              workflow: { is: { userId: ctx.auth.user.id } },
+            },
+            select: {
+              inngestEventId: true,
+              status: true,
+            },
+          })
+        : [];
+
       return {
         items: items.map(({ nodes, executions, ...workflow }) => ({
           ...workflow,
           nodeCount: nodes.length,
+          hasManualTrigger: nodes.some((node) => node.type === "MANUAL_TRIGGER"),
           latestExecution: executions[0] ?? null,
         })),
+        pendingExecutions,
         totalCount,
         page,
         pageSize,
