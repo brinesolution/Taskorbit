@@ -1,0 +1,1 @@
+export const MAX_PENDING_WORKFLOW_RUNS = 25;

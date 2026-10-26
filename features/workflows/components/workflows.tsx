@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,12 +23,19 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { MAX_PENDING_WORKFLOW_RUNS } from "../constants";
 import { useWorkflowsParams } from "../hooks/use-workflows-params";
 import {
   useCreateWorkflow,
+  useExecuteWorkflow,
   useImportWorkflow,
   useRemoveWorkflow,
   useSuspenseWorkflows,
+} from "../hooks/use-workflows";
+import {
+  type QueuedWorkflowRun,
+  WORKFLOW_RUN_DISCOVERY_TIMEOUT_MS,
+  WORKFLOW_RUN_STATUS_TIMEOUT_MS,
 } from "../hooks/use-workflows";
 
 import { parseWorkflowFile } from "../import-format";
@@ -52,6 +60,12 @@ type WorkflowItem = {
   name: string;
   createdAt: Date | string;
   updatedAt: Date | string;
+  nodeCount: number;
+  hasManualTrigger: boolean;
+  latestExecution: {
+    status: "RUNNING" | "SUCCESS" | "FAILED";
+    startedAt: Date | string;
+  } | null;
 };
 
 export const WorkflowsSearch = () => {
@@ -73,101 +87,239 @@ export const WorkflowsSearch = () => {
 };
 
 export const WorkflowsList = () => {
+  const [queuedRuns, setQueuedRuns] = useState<QueuedWorkflowRun[]>([]);
+  const activeRunIdsRef = useRef(new Set<string>());
+  const [activeRunCount, setActiveRunCount] = useState(0);
   const removeWorkflow = useRemoveWorkflow();
-  const workflows = useSuspenseWorkflows();
-
+  const executeWorkflow = useExecuteWorkflow();
+  const workflows = useSuspenseWorkflows(queuedRuns);
   const items = workflows.data.items as WorkflowItem[];
 
+  useEffect(() => {
+    if (queuedRuns.length === 0) return;
+
+    const observedExecutions = workflows.data.pendingExecutions;
+    const terminalRuns = queuedRuns.filter((run) =>
+      observedExecutions.some(
+        (execution) =>
+          execution.inngestEventId === run.eventId &&
+          execution.status !== "RUNNING",
+      ),
+    );
+    if (terminalRuns.length > 0) {
+      terminalRuns.forEach((run) => activeRunIdsRef.current.delete(run.workflowId));
+      setActiveRunCount(activeRunIdsRef.current.size);
+      const terminalEventIds = new Set(terminalRuns.map((run) => run.eventId));
+      setQueuedRuns((current) =>
+        current.filter((run) => !terminalEventIds.has(run.eventId)),
+      );
+    }
+
+    setQueuedRuns((current) => {
+      let changed = false;
+      const updated = current.map((run) => {
+        const execution = observedExecutions.find(
+          (item) => item.inngestEventId === run.eventId,
+        );
+        if (execution?.status === "RUNNING" && !run.discoveredAt) {
+          changed = true;
+          return { ...run, discoveredAt: Date.now() };
+        }
+        return run;
+      });
+      return changed ? updated : current;
+    });
+  }, [queuedRuns, workflows.data.pendingExecutions]);
+
+  useEffect(() => {
+    if (queuedRuns.length === 0) return;
+
+    const timers = queuedRuns.map((run) => {
+      const timeout = run.discoveredAt
+        ? WORKFLOW_RUN_STATUS_TIMEOUT_MS
+        : WORKFLOW_RUN_DISCOVERY_TIMEOUT_MS;
+      const start = run.discoveredAt ?? run.queuedAt;
+
+      return window.setTimeout(() => {
+        activeRunIdsRef.current.delete(run.workflowId);
+        setActiveRunCount(activeRunIdsRef.current.size);
+        setQueuedRuns((current) =>
+          current.filter((item) => item.eventId !== run.eventId),
+        );
+        toast.warning(
+          run.discoveredAt
+            ? "Run status tracking timed out. Check Executions for the latest status."
+            : "No execution record appeared yet. Check Executions before retrying.",
+        );
+      }, Math.max(0, timeout - (Date.now() - start)));
+    });
+
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [queuedRuns]);
   if (items.length === 0) {
     return <WorkflowsEmpty />;
   }
 
   return (
     <div className="space-y-4">
-      {items.map((workflow) => (
-        <a
-          key={workflow.id}
-          href={`/workflows/${workflow.id}`}
-          className="taskorbit-card group flex items-center justify-between p-5"
-        >
-          <div className="flex items-center gap-4">
-            <div className="size-11 rounded-xl bg-white shadow-md flex items-center justify-center">
-              <WorkflowIcon className="size-5 text-purple-600" />
-            </div>
+      {items.map((workflow) => {
+        const isExecuting =
+          executeWorkflow.isPending && executeWorkflow.variables?.id === workflow.id;
+        const queuedRun = queuedRuns.find(
+          (run) => run.workflowId === workflow.id,
+        );
+        const queuedExecution = queuedRun
+          ? workflows.data.pendingExecutions.find(
+              (execution) => execution.inngestEventId === queuedRun.eventId,
+            )
+          : undefined;
+        const runLimitReached = activeRunCount >= MAX_PENDING_WORKFLOW_RUNS;
+        const runDisabled =
+          !workflow.hasManualTrigger ||
+          executeWorkflow.isPending ||
+          Boolean(queuedRun) ||
+          runLimitReached;
+        const executionLabel = workflow.latestExecution
+          ? workflow.latestExecution.status === "SUCCESS"
+            ? "Succeeded"
+            : workflow.latestExecution.status === "FAILED"
+              ? "Failed"
+              : "Running"
+          : "Not run yet";
 
-            <div>
-              <h3 className="font-bold text-lg text-slate-900">
-                {workflow.name}
-              </h3>
-
-              <p className="text-sm text-muted-foreground">
-                Updated {new Date(workflow.updatedAt).toLocaleDateString()} •
-                Created {new Date(workflow.createdAt).toLocaleDateString()}
-              </p>
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                <span className="taskorbit-badge-green">
-                  Active
-                </span>
-
-                <span className="taskorbit-badge-blue flex items-center gap-1">
-                  <GitBranchIcon className="size-3" />
-                  Steps: 12
-                </span>
-
-                <span className="taskorbit-badge-gray flex items-center gap-1">
-                  <ClockIcon className="size-3" />
-                  Last Run: 5 mins ago
-                </span>
-              </div>
-            </div>
-          </div>
-
+        return (
           <div
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-            className="flex items-center gap-2"
+            key={workflow.id}
+            className="taskorbit-card group flex flex-wrap items-center justify-between gap-4 p-5"
           >
-            <Button
-              size="sm"
-              className="taskorbit-button hidden md:flex"
+            <Link
+              href={`/workflows/${workflow.id}`}
+              className="flex min-w-0 flex-1 items-center gap-4 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
             >
-              <PlayIcon className="mr-1 size-4" />
-              Run
-            </Button>
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white shadow-md">
+                <WorkflowIcon className="size-5 text-purple-600" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="truncate text-lg font-bold text-slate-900">
+                  {workflow.name}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Updated {new Date(workflow.updatedAt).toLocaleDateString()} · Created {new Date(workflow.createdAt).toLocaleDateString()}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <span className="taskorbit-badge-blue flex items-center gap-1">
+                    <GitBranchIcon className="size-3" />
+                    Nodes: {workflow.nodeCount}
+                  </span>
+                  <span className="taskorbit-badge-gray flex items-center gap-1">
+                    <ClockIcon className="size-3" />
+                    {workflow.latestExecution
+                      ? `Last run: ${executionLabel} · ${new Date(workflow.latestExecution.startedAt).toLocaleString()}`
+                      : executionLabel}
+                  </span>
+                </div>
+              </div>
+            </Link>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger className="inline-flex size-8 items-center justify-center rounded-md hover:bg-white/70">
-                <MoreVerticalIcon className="size-4" />
-              </DropdownMenuTrigger>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                className="taskorbit-button"
+                disabled={runDisabled}
+                title={
+                  !workflow.hasManualTrigger
+                    ? "Add a Manual Trigger to run this workflow from the list."
+                    : runLimitReached
+                      ? `Wait for a tracked run to finish. The limit is ${MAX_PENDING_WORKFLOW_RUNS}.`
+                      : undefined
+                }
+                onClick={() => {
+                  if (activeRunIdsRef.current.has(workflow.id)) return;
+                  if (activeRunIdsRef.current.size >= MAX_PENDING_WORKFLOW_RUNS) {
+                    toast.warning(
+                      `Wait for a tracked run to finish. The limit is ${MAX_PENDING_WORKFLOW_RUNS}.`,
+                    );
+                    return;
+                  }
 
-              <DropdownMenuContent align="end">
-                <WorkflowBackupSaveItem workflowId={workflow.id} />
-                <DropdownMenuItem
-                  className="text-destructive"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
+                  activeRunIdsRef.current.add(workflow.id);
+                  setActiveRunCount(activeRunIdsRef.current.size);
+                  executeWorkflow.mutate(
+                    { id: workflow.id },
+                    {
+                      onSuccess: ({ eventId }) => {
+                        setQueuedRuns((current) => [
+                          ...current.filter((run) => run.workflowId !== workflow.id),
+                          { workflowId: workflow.id, eventId, queuedAt: Date.now() },
+                        ]);
+                        toast.success("Run queued. Waiting for its execution record.");
+                      },
+                      onError: (error) => {
+                        activeRunIdsRef.current.delete(workflow.id);
+                        setActiveRunCount(activeRunIdsRef.current.size);
+                        toast.error(error.message || "Could not run workflow.");
+                      },
+                    },
+                  );
+                }}
+              >
+                {queuedRun ? (
+                  <Loader2Icon className="mr-1 size-4 animate-spin" />
+                ) : isExecuting ? (
+                  <Loader2Icon className="mr-1 size-4 animate-spin" />
+                ) : (
+                  <PlayIcon className="mr-1 size-4" />
+                )}
+                {queuedRun
+                  ? queuedExecution
+                    ? "Running…"
+                    : "Queued…"
+                  : isExecuting
+                    ? "Starting…"
+                    : "Run"}
+              </Button>
+              {!workflow.hasManualTrigger && (
+                <span className="max-w-48 text-xs text-muted-foreground">
+                  Add a Manual Trigger to run from this list.
+                </span>
+              )}
+              {workflow.hasManualTrigger && runLimitReached && !queuedRun && (
+                <span role="status" className="max-w-52 text-xs text-muted-foreground">
+                  {MAX_PENDING_WORKFLOW_RUNS} runs are being tracked. Wait for one to finish.
+                </span>
+              )}
 
-                    removeWorkflow.mutate({
-                      id: workflow.id,
-                    });
-                  }}
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  aria-label={`More actions for ${workflow.name}`}
+                  className="inline-flex size-8 items-center justify-center rounded-md hover:bg-white/70"
                 >
-                  <TrashIcon className="mr-2 size-4" />
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <MoreVerticalIcon className="size-4" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <WorkflowBackupSaveItem workflowId={workflow.id} />
+                  <DropdownMenuItem
+                    className="text-destructive"
+                    onClick={() =>
+                      removeWorkflow.mutate(
+                        { id: workflow.id },
+                        { onError: (error) => toast.error(error.message || "Could not delete workflow.") },
+                      )
+                    }
+                  >
+                    <TrashIcon className="mr-2 size-4" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
-        </a>
-      ))}
+        );
+      })}
     </div>
   );
 };
-
 const WorkflowImportAction = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -279,7 +431,7 @@ export const WorkflowsEmpty = () => {
         name: template.name,
         graph: template.graph,
       });
-      toast.success(`${template.name} added to your workspace`);
+      toast.success(`${template.name} added to your workflows`);
       router.push(`/workflows/${created.id}`);
     } catch {
       toast.error("Could not add this workflow. Please try again.");
@@ -292,10 +444,10 @@ export const WorkflowsEmpty = () => {
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-              Start with a demo workflow
+              Start with a template
             </h2>
             <p className="mt-1 max-w-2xl text-sm text-slate-600 dark:text-zinc-400">
-              Add a ready-made flow to your workspace, inspect the steps, and connect your own service credentials.
+              Choose a workflow template, review its steps, then connect your own service credentials before running it.
             </p>
           </div>
           <span className="text-xs text-slate-500 dark:text-zinc-500">
