@@ -10,6 +10,7 @@ export interface NodeExecutorParams<
 > {
   data: TData;
   nodeId: string;
+  workflowOwnerId: string;
   context: WorkflowContext;
   step: StepTools;
   publish: Realtime.PublishFn;

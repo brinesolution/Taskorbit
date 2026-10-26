@@ -1,17 +1,23 @@
 "use client";
 
 import { useSuspenseExecution } from "../hooks/use-executions";
+import {
+  executionRealtimeIdentityKey,
+  NeonExecutionStatus,
+} from "./neon-execution-status";
 
 export const ExecutionDetails = ({
   executionId,
+  userId,
 }: {
   executionId: string;
+  userId: string;
 }) => {
   const { data } = useSuspenseExecution(executionId);
 
   const execution = data as {
     id: string;
-    status: string;
+    status: "RUNNING" | "SUCCESS" | "FAILED";
     startedAt: string | Date;
     workflow: {
       name: string;
@@ -33,7 +39,12 @@ export const ExecutionDetails = ({
 
       <div className="rounded-lg border p-4">
         <p className="font-semibold">Status</p>
-        <p>{execution.status}</p>
+        <NeonExecutionStatus
+          key={executionRealtimeIdentityKey(userId, executionId)}
+          executionId={executionId}
+          userId={userId}
+          initialStatus={execution.status}
+        />
       </div>
 
       <div className="rounded-lg border p-4">

@@ -83,9 +83,28 @@ model Workflow {
   connections Connection[]
 
   executions Execution[]
+  webhookCredentials WorkflowWebhookCredential[]
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model WorkflowWebhookCredential {
+  id        String   @id @default(cuid())
+  workflowId String
+  workflow  Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  provider  WebhookProvider
+  tokenHash String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([workflowId, provider])
+  @@index([workflowId])
+}
+
+enum WebhookProvider {
+  STRIPE
+  GOOGLE_FORM
 }
 
 enum ExecutionStatus {

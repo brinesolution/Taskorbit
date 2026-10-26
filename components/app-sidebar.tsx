@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 import {
   CreditCardIcon,
@@ -56,7 +56,6 @@ export const AppSidebar = ({
   billingEnabled?: boolean;
 }) => {
   const pathname = usePathname();
-  const router = useRouter();
 
   return (
     <Sidebar collapsible="icon">
@@ -153,7 +152,7 @@ export const AppSidebar = ({
                 authClient.signOut({
                   fetchOptions: {
                     onSuccess: () => {
-                      router.push("/login");
+                      window.location.assign("/login");
                     },
                   },
                 });

@@ -4,7 +4,7 @@ import test from "node:test";
 import {
   serializeWorkflowTemplate,
   workflowTemplates,
-} from "../features/workflows/demo-templates.ts";
+} from "../features/workflows/demo-templates";
 
 test("the public workspace has three valid, connected demo workflows", () => {
   assert.deepEqual(

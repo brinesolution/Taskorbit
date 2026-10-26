@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { sendWorkflowExecution } from "@/inngest/utils";
+import prisma from "@/lib/db";
+import { isWebhookTokenValid } from "@/features/trigger/server/webhook-token";
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,6 +17,18 @@ export async function POST(request: NextRequest) {
         },
         { status: 400 }
       );
+    }
+
+    const credential = await prisma.workflowWebhookCredential.findUnique({
+      where: { workflowId_provider: { workflowId, provider: "GOOGLE_FORM" } },
+      select: { tokenHash: true },
+    });
+    const workflowHasTrigger = await prisma.node.findFirst({
+      where: { workflowId, type: "GOOGLE_FORM_TRIGGER" }, select: { id: true },
+    });
+    const bearer = request.headers.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1];
+    if (!workflowHasTrigger || !isWebhookTokenValid(bearer, credential?.tokenHash)) {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
