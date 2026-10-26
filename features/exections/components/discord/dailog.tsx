@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -23,8 +24,16 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useCredentialsByType } from "@/features/credentials/hooks/use-credentials";
 
 const formSchema = z.object({
   variableName: z
@@ -34,17 +43,11 @@ const formSchema = z.object({
       message:
         "Variable name must start with a letter or underscore and contain only letters, numbers, and underscores",
     }),
-
-  webhookUrl: z
-    .string()
-    .min(1, "Webhook URL is required")
-    .url("Enter a valid Discord webhook URL"),
-
+  credentialId: z.string().min(1, "Select a saved Discord credential"),
   content: z
     .string()
     .min(1, "Message content is required")
     .max(2000, "Discord messages cannot exceed 2000 characters"),
-
   username: z.string().optional(),
 });
 
@@ -55,19 +58,31 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: DiscordFormValues) => void;
   defaultValues?: Partial<DiscordFormValues>;
+  hasLegacyWebhook?: boolean;
 }
+
+type CredentialOption = { id: string; name: string; type?: string };
 
 export const DiscordDialog = ({
   open,
   onOpenChange,
   onSubmit,
   defaultValues = {},
+  hasLegacyWebhook = false,
 }: Props) => {
+  const {
+    data: credentials = [],
+    isLoading: isLoadingCredentials,
+    isError: credentialsError,
+    refetch: refetchCredentials,
+  } = useCredentialsByType("DISCORD");
+  const options = credentials as CredentialOption[];
+
   const form = useForm<DiscordFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       variableName: defaultValues.variableName || "myDiscord",
-      webhookUrl: defaultValues.webhookUrl || "",
+      credentialId: defaultValues.credentialId || "",
       content: defaultValues.content || "",
       username: defaultValues.username || "",
     },
@@ -77,20 +92,27 @@ export const DiscordDialog = ({
     if (open) {
       form.reset({
         variableName: defaultValues.variableName || "myDiscord",
-        webhookUrl: defaultValues.webhookUrl || "",
+        credentialId: defaultValues.credentialId || "",
         content: defaultValues.content || "",
         username: defaultValues.username || "",
       });
     }
   }, [open, defaultValues, form]);
 
-  const watchVariableName =
-    form.watch("variableName") || "myDiscord";
+  const watchVariableName = form.watch("variableName") || "myDiscord";
 
   const handleSubmit = (values: DiscordFormValues) => {
     onSubmit(values);
     onOpenChange(false);
   };
+
+  const credentialStatus = isLoadingCredentials
+    ? "Loading saved Discord credentials…"
+    : credentialsError
+      ? "Saved Discord credentials could not be loaded."
+      : options.length === 0
+        ? "No saved Discord credentials are available."
+        : undefined;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -98,7 +120,7 @@ export const DiscordDialog = ({
         <DialogHeader>
           <DialogTitle>Discord Configuration</DialogTitle>
           <DialogDescription>
-            Configure the Discord webhook settings for this node.
+            Configure which saved Discord webhook this node uses and the message it sends.
           </DialogDescription>
         </DialogHeader>
 
@@ -107,23 +129,61 @@ export const DiscordDialog = ({
             onSubmit={form.handleSubmit(handleSubmit)}
             className="space-y-6"
           >
+            {hasLegacyWebhook && !form.watch("credentialId") && (
+              <p className="text-sm text-destructive" role="alert">
+                This node has an older webhook setting. It is hidden for security;
+                select a saved Discord credential to replace it before saving.
+              </p>
+            )}
+
             <FormField
               control={form.control}
-              name="variableName"
+              name="credentialId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Variable Name</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="myDiscord"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Use this name to reference the result in
-                    other nodes: {" "}
-                    {`{{${watchVariableName}.text}}`}
-                  </FormDescription>
+                  <FormLabel>Saved Discord credential</FormLabel>
+                  <Select
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    disabled={isLoadingCredentials || credentialsError || options.length === 0}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="w-full" aria-label="Saved Discord credential">
+                        <SelectValue placeholder="Select a saved Discord credential" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {options.map((credential) => (
+                        <SelectItem key={credential.id} value={credential.id}>
+                          {credential.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {credentialStatus ? (
+                    <div className="space-y-2" role="status" aria-live="polite">
+                      <p className="text-sm text-muted-foreground">{credentialStatus}</p>
+                      {credentialsError && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void refetchCredentials()}
+                        >
+                          Retry
+                        </Button>
+                      )}
+                      <p className="text-sm">
+                        <Link className="underline" href="/credentials/new">
+                          Open credential settings to add a Discord credential
+                        </Link>
+                      </p>
+                    </div>
+                  ) : (
+                    <FormDescription>
+                      The webhook URL stays encrypted in credential settings and is not stored in this workflow.
+                    </FormDescription>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
@@ -131,19 +191,15 @@ export const DiscordDialog = ({
 
             <FormField
               control={form.control}
-              name="webhookUrl"
+              name="variableName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Webhook URL</FormLabel>
+                  <FormLabel>Variable Name</FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder="https://discord.com/api/webhooks/..."
-                      {...field}
-                    />
+                    <Input placeholder="myDiscord" {...field} />
                   </FormControl>
                   <FormDescription>
-                    Get this from Discord: Channel Settings →
-                    Integrations → Webhooks
+                    Reference the result in other nodes: {`{{${watchVariableName}.text}}`}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -164,8 +220,7 @@ export const DiscordDialog = ({
                     />
                   </FormControl>
                   <FormDescription>
-                    The message to send. Use variables like
-                    {" {{myGemini.text}}"}.
+                    The message to send. Use variables like {" {{myGemini.text}}"}.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -177,14 +232,9 @@ export const DiscordDialog = ({
               name="username"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>
-                    Bot Username Optional
-                  </FormLabel>
+                  <FormLabel>Bot Username (optional)</FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder="Workflow Bot"
-                      {...field}
-                    />
+                    <Input placeholder="Workflow Bot" {...field} />
                   </FormControl>
                   <FormDescription>
                     Override the webhook default username.
@@ -195,7 +245,9 @@ export const DiscordDialog = ({
             />
 
             <DialogFooter>
-              <Button type="submit">Save</Button>
+              <Button type="submit" disabled={isLoadingCredentials || credentialsError || options.length === 0}>
+                Save
+              </Button>
             </DialogFooter>
           </form>
         </Form>
