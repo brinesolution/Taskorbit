@@ -1,10 +1,11 @@
 import prisma from "@/lib/db";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
   createTRPCRouter,
   protectedProcedure,
 } from "@/trpc/init";
-import { decryptCredentialValue, encryptCredentialValue } from "./encryption";
+import { encryptCredentialValue } from "./encryption";
 
 const credentialTypes = [
   "OPENAI",
@@ -52,6 +53,10 @@ export const credentialsRouter = createTRPCRouter({
           id: input.id,
           userId: ctx.auth.user.id,
         },
+        select: {
+          id: true,
+          name: true,
+        },
       });
     }),
 
@@ -61,29 +66,46 @@ export const credentialsRouter = createTRPCRouter({
         id: z.string(),
         name: z.string().min(1, "Name is required"),
         type: z.enum(credentialTypes),
-        value: z.string().min(1, "Value is required"),
+        value: z.string().optional(),
       })
     )
-    .mutation(({ ctx, input }) => {
+    .mutation(async ({ ctx, input }) => {
       const { id, name, type, value } = input;
 
-      return prisma.credential.update({
-        where: {
-          id,
-          userId: ctx.auth.user.id,
-        },
-        data: {
-          name,
-          type,
-          value: encryptCredentialValue(value),
-        },
-        select: {
-          id: true,
-          name: true,
-          type: true,
-          createdAt: true,
-          updatedAt: true,
-        },
+      return prisma.$transaction(async (tx) => {
+        const current = await tx.credential.findFirstOrThrow({
+          where: {
+            id,
+            userId: ctx.auth.user.id,
+          },
+          select: { type: true },
+        });
+
+        if (current.type !== type && !value?.trim()) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "A new secret is required when changing credential type.",
+          });
+        }
+
+        return tx.credential.update({
+          where: {
+            id,
+            userId: ctx.auth.user.id,
+          },
+          data: {
+            name,
+            type,
+            ...(value?.trim() ? { value: encryptCredentialValue(value) } : {}),
+          },
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
       });
     }),
 
@@ -99,7 +121,6 @@ export const credentialsRouter = createTRPCRouter({
           id: true,
           name: true,
           type: true,
-          value: true,
           createdAt: true,
           updatedAt: true,
         },
@@ -107,7 +128,7 @@ export const credentialsRouter = createTRPCRouter({
 
       return {
         ...credential,
-        value: decryptCredentialValue(credential.value),
+        hasValue: true,
       };
     }),
 

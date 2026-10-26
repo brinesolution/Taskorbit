@@ -49,7 +49,7 @@ type CredentialTypeValue = (typeof credentialTypes)[number];
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
   type: z.enum(credentialTypes),
-  value: z.string().min(1, "Credential value is required"),
+  value: z.string(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -59,7 +59,7 @@ interface CredentialFormProps {
     id?: string;
     name: string;
     type: CredentialTypeValue;
-    value: string;
+    hasValue?: boolean;
   };
 }
 
@@ -73,21 +73,44 @@ export const CredentialForm = ({ initialData }: CredentialFormProps) => {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: initialData ?? {
-      name: "",
-      type: "GEMINI",
+    defaultValues: {
+      name: initialData?.name ?? "",
+      type: initialData?.type ?? "GEMINI",
       value: "",
     },
   });
 
   const onSubmit = async (values: FormValues) => {
+    if (!isEdit && !values.value.trim()) {
+      form.setError("value", {
+        type: "required",
+        message: "Credential value is required",
+      });
+      return;
+    }
+
+    if (
+      isEdit &&
+      initialData &&
+      values.type !== initialData.type &&
+      !values.value.trim()
+    ) {
+      form.setError("value", {
+        type: "required",
+        message: "Enter a new secret when changing credential type",
+      });
+      return;
+    }
+
+    form.clearErrors("value");
+
     try {
       if (isEdit && initialData?.id) {
         await updateCredential.mutateAsync({
           id: initialData.id,
           name: values.name,
           type: values.type,
-          value: values.value,
+          ...(values.value.trim() ? { value: values.value } : {}),
         });
       } else {
         await createCredential.mutateAsync({
@@ -99,8 +122,8 @@ export const CredentialForm = ({ initialData }: CredentialFormProps) => {
 
       router.push("/credentials");
       router.refresh();
-    } catch (error) {
-      console.error(error);
+    } catch {
+      // The credential mutation hook displays the request error in a toast.
     }
   };
 
@@ -108,22 +131,19 @@ export const CredentialForm = ({ initialData }: CredentialFormProps) => {
     createCredential.isPending || updateCredential.isPending;
 
   return (
-    <Card className="shadow-none">
+    <Card className="mx-auto w-full max-w-3xl border border-border bg-card/90 shadow-xl shadow-black/10">
       <CardHeader>
-        <CardTitle>
-          {isEdit ? "Edit Credential" : "Create Credential"}
+        <CardTitle className="text-xl font-semibold tracking-tight">
+          {isEdit ? "Edit credential" : "Create credential"}
         </CardTitle>
         <CardDescription>
-          Add or update credentials used by workflow nodes.
+          Add or update a secure connection used by your workflows.
         </CardDescription>
       </CardHeader>
 
       <CardContent>
         <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit(onSubmit)}
-            className="space-y-6"
-          >
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <FormField
               control={form.control}
               name="name"
@@ -180,23 +200,55 @@ export const CredentialForm = ({ initialData }: CredentialFormProps) => {
               name="value"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Value</FormLabel>
+                  <FormLabel>
+                    {isEdit ? "Replace secret (optional)" : "Secret value"}
+                  </FormLabel>
                   <FormControl>
                     <Input
                       type="password"
-                      placeholder="Enter API key, token, or webhook URL"
+                      autoComplete="new-password"
+                      placeholder={
+                        isEdit
+                          ? "Leave blank to keep the saved secret"
+                          : "Enter an API key, token, or webhook URL"
+                      }
                       disabled={isPending}
                       {...field}
                     />
                   </FormControl>
+                  {isEdit && initialData?.hasValue && (
+                    <p className="text-xs text-muted-foreground">
+                      A secret is saved. Leave this field blank to keep it unchanged.
+                    </p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            <Button disabled={isPending} type="submit">
-              {isEdit ? "Save changes" : "Create credential"}
-            </Button>
+            <div className="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isPending}
+                onClick={() => router.push("/credentials")}
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={isPending}
+                type="submit"
+                className="taskorbit-button"
+              >
+                {isPending
+                  ? isEdit
+                    ? "Saving…"
+                    : "Creating…"
+                  : isEdit
+                    ? "Save changes"
+                    : "Create credential"}
+              </Button>
+            </div>
           </form>
         </Form>
       </CardContent>

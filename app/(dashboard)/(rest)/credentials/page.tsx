@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import { ErrorBoundary } from "react-error-boundary";
 import { type SearchParams } from "nuqs";
 
 import { requireAuth } from "@/lib/auth-utils";
@@ -12,7 +11,7 @@ import {
   CredentialsContainer,
   CredentialsList,
   CredentialsLoading,
-  CredentialsError,
+  CredentialsErrorBoundary,
 } from "@/features/credentials/components/credentials";
 
 type Props = {
@@ -28,13 +27,13 @@ const Page = async ({ searchParams }: Props) => {
 
   return (
     <HydrateClient>
-      <ErrorBoundary fallback={<CredentialsError />}>
+      <CredentialsErrorBoundary>
         <Suspense fallback={<CredentialsLoading />}>
           <CredentialsContainer>
             <CredentialsList />
           </CredentialsContainer>
         </Suspense>
-      </ErrorBoundary>
+      </CredentialsErrorBoundary>
     </HydrateClient>
   );
 };

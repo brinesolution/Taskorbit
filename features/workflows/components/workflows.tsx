@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ErrorBoundary } from "react-error-boundary";
+import { QueryErrorResetBoundary } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -51,7 +53,6 @@ import {
   EntitySearch,
   LoadingView,
   ErrorView,
-  EntityList,
 } from "./entity-components";
 
 type WorkflowItem = {
@@ -189,17 +190,17 @@ export const WorkflowsList = () => {
         return (
           <div
             key={workflow.id}
-            className="taskorbit-card group flex flex-wrap items-center justify-between gap-4 p-5"
+            className="taskorbit-card group flex flex-col items-stretch justify-between gap-4 p-4 sm:flex-row sm:items-center sm:p-5"
           >
             <Link
               href={`/workflows/${workflow.id}`}
               className="flex min-w-0 flex-1 items-center gap-4 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
             >
-              <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white shadow-md">
-                <WorkflowIcon className="size-5 text-purple-600" />
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+                <WorkflowIcon className="size-5" />
               </div>
               <div className="min-w-0">
-                <h3 className="truncate text-lg font-bold text-slate-900">
+                <h3 className="truncate text-lg font-semibold text-card-foreground">
                   {workflow.name}
                 </h3>
                 <p className="text-sm text-muted-foreground">
@@ -220,7 +221,7 @@ export const WorkflowsList = () => {
               </div>
             </Link>
 
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
               <Button
                 type="button"
                 size="sm"
@@ -292,7 +293,7 @@ export const WorkflowsList = () => {
               <DropdownMenu>
                 <DropdownMenuTrigger
                   aria-label={`More actions for ${workflow.name}`}
-                  className="inline-flex size-8 items-center justify-center rounded-md hover:bg-white/70"
+                  className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
                 >
                   <MoreVerticalIcon className="size-4" />
                 </DropdownMenuTrigger>
@@ -413,9 +414,33 @@ export const WorkflowsLoading = () => {
   return <LoadingView entity="workflows" />;
 };
 
-export const WorkflowsError = () => {
-  return <ErrorView message="Error loading workflows" />;
+export const WorkflowsError = ({ onRetry }: { onRetry: () => void }) => {
+  return (
+    <ErrorView
+      message="Workflows could not load. Check your connection and try again."
+      onRetry={onRetry}
+    />
+  );
 };
+
+export const WorkflowsErrorBoundary = ({
+  children,
+}: {
+  children: React.ReactNode;
+}) => (
+  <QueryErrorResetBoundary>
+    {({ reset }) => (
+      <ErrorBoundary
+        onReset={reset}
+        fallbackRender={({ resetErrorBoundary }) => (
+          <WorkflowsError onRetry={resetErrorBoundary} />
+        )}
+      >
+        {children}
+      </ErrorBoundary>
+    )}
+  </QueryErrorResetBoundary>
+);
 
 export const WorkflowsEmpty = () => {
   const createWorkflow = useCreateWorkflow();

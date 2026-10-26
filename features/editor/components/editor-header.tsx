@@ -1,10 +1,6 @@
 "use client";
 
-import {
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { useRef } from "react";
 
 import { DownloadIcon, SaveIcon } from "lucide-react";
 import { useAtomValue } from "jotai";
@@ -140,40 +136,37 @@ export const EditorNameInput = ({
   const updateName =
     useUpdateWorkflowName();
 
-  const [name, setName] = useState(
-    workflow?.name ?? ""
-  );
-
   const inputRef =
     useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    setName(workflow?.name ?? "");
-  }, [workflow]);
+  const saveRequested = useRef(false);
 
   const handleSave = () => {
-    const trimmedName = name.trim();
+    const trimmedName = inputRef.current?.value.trim() ?? "";
 
     if (
+      saveRequested.current ||
+      updateName.isPending ||
       !trimmedName ||
       trimmedName === workflow?.name
     ) {
       return;
     }
 
-    updateName.mutate({
-      id: workflowId,
-      name: trimmedName,
-    });
+    saveRequested.current = true;
+    updateName.mutate(
+      {
+        id: workflowId,
+        name: trimmedName,
+      },
+      { onSettled: () => { saveRequested.current = false; } },
+    );
   };
 
   return (
     <Input
+      key={workflow?.name}
       ref={inputRef}
-      value={name}
-      onChange={(e) =>
-        setName(e.target.value)
-      }
+      defaultValue={workflow?.name ?? ""}
       onBlur={handleSave}
       onKeyDown={(e) => {
         if (e.key === "Enter") {
@@ -181,12 +174,15 @@ export const EditorNameInput = ({
           inputRef.current?.blur();
         }
       }}
+      aria-label="Workflow name"
       disabled={updateName.isPending}
       className="
         border-none
         shadow-none
         p-0
         h-auto
+        min-w-0
+        w-full
         text-lg
         font-semibold
         focus-visible:ring-0
@@ -202,8 +198,8 @@ export const EditorBreadcrumbs = ({
   workflowId: string;
 }) => {
   return (
-    <div className="flex items-center gap-4">
-      <Breadcrumb>
+    <div className="flex min-w-0 items-center gap-3">
+      <Breadcrumb className="shrink-0">
         <BreadcrumbList>
           <BreadcrumbItem>
             <BreadcrumbLink href="/workflows">
@@ -231,13 +227,16 @@ export const EditorHeader = ({
     <header
       className="
         flex
-        h-14
+        min-h-14
         shrink-0
+        flex-wrap
         items-center
         gap-2
         border-b
-        px-4
+        px-3
+        py-2
         bg-background
+        sm:px-4
       "
     >
       <SidebarTrigger />
@@ -245,16 +244,20 @@ export const EditorHeader = ({
       <div
         className="
           flex
-          items-center
-          justify-between
-          w-full
+          min-w-0
+          flex-1
+          flex-col
+          gap-2
+          sm:flex-row
+          sm:items-center
+          sm:justify-between
         "
       >
         <EditorBreadcrumbs
           workflowId={workflowId}
         />
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center justify-end gap-2">
           <EditorExportButton workflowId={workflowId} />
           <EditorSaveButton workflowId={workflowId} />
         </div>

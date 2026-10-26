@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import { ErrorBoundary } from "react-error-boundary";
 import { type SearchParams } from "nuqs";
 
 import { HydrateClient } from "@/trpc/server";
@@ -11,7 +10,7 @@ import {
   ExecutionsContainer,
   ExecutionsList,
   ExecutionsLoading,
-  ExecutionsError,
+  ExecutionsErrorBoundary,
 } from "@/features/exections/components/executions";
 
 type Props = {
@@ -25,13 +24,13 @@ const Page = async ({ searchParams }: Props) => {
 
   return (
     <HydrateClient>
-      <ErrorBoundary fallback={<ExecutionsError />}>
+      <ExecutionsErrorBoundary>
         <Suspense fallback={<ExecutionsLoading />}>
           <ExecutionsContainer>
             <ExecutionsList />
           </ExecutionsContainer>
         </Suspense>
-      </ErrorBoundary>
+      </ExecutionsErrorBoundary>
     </HydrateClient>
   );
 };

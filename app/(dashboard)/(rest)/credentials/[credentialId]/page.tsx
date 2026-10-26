@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import prisma from "@/lib/db";
 import { CredentialForm } from "@/features/credentials/components/credential";
 import { requireAuth } from "@/lib/auth-utils";
-import { decryptCredentialValue } from "@/features/credentials/server/encryption";
 
 type Props = {
   params: Promise<{
@@ -27,16 +26,22 @@ const Page = async ({ params }: Props) => {
   }
 
   return (
-    <div className="p-4 md:px-10 md:py-6 h-full">
-      <div className="mx-auto max-w-screen-md w-full flex flex-col gap-y-8 h-full">
+    <div className="min-h-full p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-y-6">
         <CredentialForm
-  initialData={{
-    id: credential.id,
-    name: credential.name,
-    type: credential.type as "GEMINI" | "DISCORD" | "WHATSAPP" | "STRIPE",
-    value: decryptCredentialValue(credential.value),
-  }}
-/>
+          initialData={{
+            id: credential.id,
+            name: credential.name,
+            type: credential.type as
+              | "OPENAI"
+              | "ANTHROPIC"
+              | "GEMINI"
+              | "DISCORD"
+              | "WHATSAPP"
+              | "STRIPE",
+            hasValue: Boolean(credential.value),
+          }}
+        />
       </div>
     </div>
   );
