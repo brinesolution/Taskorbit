@@ -72,27 +72,16 @@ export const executeWorkflow = inngest.createFunction(
           },
         });
 
-        console.log(
-          "DB NODES:",
-          workflow.nodes.map((node: any) => ({
-  id: node.id,
-  type: node.type,
-  data: node.data,
-}))
-        );
-
-        console.log("DB CONNECTIONS:", workflow.connections);
-
-        const nodes = topologicalSort(workflow.nodes, workflow.connections);
-
-        console.log(
-          "Sorted nodes:",
-          nodes.map((node: any) => ({
-  id: node.id,
-  type: node.type,
-  data: node.data,
-}))
-        );
+        const sortedNodes = topologicalSort(workflow.nodes, workflow.connections);
+        const nodes = sortedNodes.map((node: any) => {
+          if (node.type !== "DISCORD") return node;
+          const data = { ...((node.data as Record<string, unknown>) ?? {}) };
+          const hasLegacyWebhook = typeof data.webhookUrl === "string" && data.webhookUrl.length > 0;
+          delete data.webhookUrl;
+          delete data.hasLegacyWebhook;
+          if (hasLegacyWebhook) data.hasLegacyWebhook = true;
+          return { ...node, data };
+        });
 
         return { nodes, workflowOwnerId: workflow.userId };
       });

@@ -220,10 +220,13 @@ export const workflowsRouter = createTRPCRouter({
         },
       });
 
-      return await prisma.$transaction(async (tx: any) => {
-        console.log("NODES:", nodes);
-        console.log("EDGES:", edges);
+      const existingNodes = await prisma.node.findMany({
+        where: { workflowId: id },
+        select: { id: true, type: true, data: true },
+      });
+      const existingById = new Map(existingNodes.map((node: any) => [node.id, node]));
 
+      return await prisma.$transaction(async (tx: any) => {
         await tx.connection.deleteMany({
           where: {
             workflowId: id,
@@ -243,7 +246,20 @@ export const workflowsRouter = createTRPCRouter({
             name: node.type || "unknown",
             type: node.type as NodeTypeValue,
             position: node.position,
-           data: JSON.parse(JSON.stringify(node.data ?? {})),
+           data: (() => {
+             const incoming = { ...(node.data ?? {}) };
+             delete incoming.hasLegacyWebhook;
+             const existing = existingById.get(node.id) as any;
+             const priorData = existing?.data as Record<string, unknown> | null;
+             // Preserve hidden legacy webhook data during unrelated editor saves;
+             // selecting a saved credential explicitly retires the legacy value.
+             if (node.type === "DISCORD" && existing?.type === "DISCORD" &&
+                 !("webhookUrl" in incoming) && !("credentialId" in incoming) &&
+                 typeof priorData?.webhookUrl === "string") {
+               incoming.webhookUrl = priorData.webhookUrl;
+             }
+             return JSON.parse(JSON.stringify(incoming));
+           })(),
           })),
         });
 
@@ -313,7 +329,14 @@ export const workflowsRouter = createTRPCRouter({
           x: number;
           y: number;
         },
-        data: (node.data as Record<string, unknown>) || {},
+        data: (() => {
+          const data = { ...((node.data as Record<string, unknown>) || {}) };
+          if (typeof data.webhookUrl === "string" && data.webhookUrl.length > 0) {
+            data.hasLegacyWebhook = true;
+            delete data.webhookUrl;
+          }
+          return data;
+        })(),
       }));
 const edges: Edge[] = workflow.connections.map(
   (connection: any) => ({

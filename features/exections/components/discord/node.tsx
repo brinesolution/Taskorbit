@@ -16,6 +16,8 @@ import {
 
 type DiscordNodeData = {
   variableName?: string;
+  credentialId?: string;
+  hasLegacyWebhook?: boolean;
   webhookUrl?: string;
   content?: string;
   username?: string;
@@ -33,10 +35,14 @@ export const DiscordNode = memo(
         nodes.map((node) => {
           if (node.id !== props.id) return node;
 
+          const updatedData = { ...node.data };
+          delete (updatedData as DiscordNodeData).webhookUrl;
+          delete (updatedData as DiscordNodeData).hasLegacyWebhook;
+
           return {
             ...node,
             data: {
-              ...node.data,
+              ...updatedData,
               ...values,
             },
           };
@@ -61,6 +67,10 @@ export const DiscordNode = memo(
           onOpenChange={setDialogOpen}
           onSubmit={handleSubmit}
           defaultValues={nodeData}
+          hasLegacyWebhook={Boolean(
+            nodeData?.hasLegacyWebhook ||
+              (nodeData?.webhookUrl && !nodeData.credentialId)
+          )}
         />
 
         <BaseExecutionNode

@@ -106,7 +106,7 @@ export function stripCredentialReferences(value: unknown): unknown {
   return Object.fromEntries(
     Object.entries(value).flatMap(([key, nested]) => {
       const normalized = key.toLowerCase().replaceAll("_", "");
-      if (normalized === "credentialid") return [];
+      if (normalized === "credentialid" || normalized === "webhookurl" || normalized === "haslegacywebhook") return [];
       return [[key, stripCredentialReferences(nested)]];
     })
   );
