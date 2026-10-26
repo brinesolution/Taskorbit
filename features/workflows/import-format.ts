@@ -11,6 +11,7 @@ const workflowNodeTypes = [
   "DISCORD",
   "SLACK",
   "WHATSAPP",
+  "TELEGRAM",
 ] as const;
 
 const workflowGraphSchema = z

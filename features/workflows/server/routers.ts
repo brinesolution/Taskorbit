@@ -18,6 +18,7 @@ const NodeType = {
   GEMINI: "GEMINI",
   DISCORD: "DISCORD",
   WHATSAPP: "WHATSAPP",
+  TELEGRAM: "TELEGRAM",
   OPENAI: "OPENAI",
   SLACK: "SLACK",
 } as const;

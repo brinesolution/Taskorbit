@@ -43,6 +43,7 @@ const NodeType = {
   GEMINI: "GEMINI",
   DISCORD: "DISCORD",
   WHATSAPP: "WHATSAPP",
+  TELEGRAM: "TELEGRAM",
 } as const;
 
 type WorkflowEditorData = {

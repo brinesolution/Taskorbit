@@ -13,6 +13,7 @@ const credentialTypes = [
   "GEMINI",
   "DISCORD",
   "WHATSAPP",
+  "TELEGRAM",
   "STRIPE",
 ] as const;
 

@@ -17,6 +17,7 @@ type CredentialType =
   | "GEMINI"
   | "DISCORD"
   | "WHATSAPP"
+  | "TELEGRAM"
   | "STRIPE";
 
 export const useSuspenseCredentials = () => {

@@ -8,6 +8,7 @@ const NodeType = {
   GEMINI: "GEMINI",
   DISCORD: "DISCORD",
   WHATSAPP: "WHATSAPP",
+  TELEGRAM: "TELEGRAM",
 } as const;
 
 import { InitialNode } from "../components/initial-node";
@@ -16,6 +17,7 @@ import { HttpRequestNode } from "../features/exections/components/http-request/n
 import { GeminiNode } from "../features/exections/components/gemini/node";
 import { DiscordNode } from "@/features/exections/components/discord/node";
 import { WhatsAppNode } from "@/features/exections/components/whatsapp/node";
+import { TelegramNode } from "@/features/exections/components/telegram/node";
 
 import { ManualTriggerNode } from "../features/trigger/components/manual-trigger/node";
 import { GoogleFormTrigger } from "../features/trigger/components/google-form-trigger/node";
@@ -32,6 +34,7 @@ export const nodeComponents = {
   [NodeType.GEMINI]: GeminiNode,
   [NodeType.DISCORD]: DiscordNode,
   [NodeType.WHATSAPP]: WhatsAppNode,
+  [NodeType.TELEGRAM]: TelegramNode,
 } as const satisfies NodeTypes;
 
 export type RegisteredNodeType =
