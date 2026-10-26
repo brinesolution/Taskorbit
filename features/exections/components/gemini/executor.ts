@@ -5,8 +5,11 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText } from "ai";
 
 import prisma from "@/lib/db";
+import { getNeonGeminiModel } from "@/lib/neon/ai-gateway";
 import type { NodeExecutor } from "../../types";
 import { geminiChannel } from "@/inngest/channels/gemini";
+import { resolveGeminiPrompt } from "./prompt";
+import { decryptCredentialValue } from "@/features/credentials/server/encryption";
 
 Handlebars.registerHelper("json", (context) => {
   const jsonString = JSON.stringify(context, null, 2);
@@ -14,18 +17,20 @@ Handlebars.registerHelper("json", (context) => {
 });
 
 export type GeminiData = {
+  provider?: "google" | "neon";
   variableName?: string;
   credentialId?: string;
   model?: string;
   systemPrompt?: string;
   userPrompt?: string;
+  prompt?: string;
 };
 
 export const geminiExecutor: NodeExecutor<GeminiData> = async ({
   data,
   nodeId,
+  workflowOwnerId,
   context,
-  step,
   publish,
 }) => {
   await publish(
@@ -40,11 +45,8 @@ export const geminiExecutor: NodeExecutor<GeminiData> = async ({
       throw new NonRetriableError("Gemini node: Variable name is missing");
     }
 
-    if (!data.credentialId) {
-      throw new NonRetriableError("Gemini node: Credential is required");
-    }
-
-    if (!data.userPrompt) {
+    const promptTemplate = resolveGeminiPrompt(data);
+    if (!promptTemplate) {
       throw new NonRetriableError("Gemini node: User prompt is missing");
     }
 
@@ -52,30 +54,51 @@ export const geminiExecutor: NodeExecutor<GeminiData> = async ({
       ? Handlebars.compile(data.systemPrompt)(context)
       : "You are a helpful assistant.";
 
-    const userPrompt = Handlebars.compile(data.userPrompt)(context);
+    const userPrompt = Handlebars.compile(promptTemplate)(context);
 
     // IMPORTANT:
     // Do not use step.run here.
     // This executor already runs inside a step.run from functions.ts.
-    const credential = await prisma.credential.findUnique({
-      where: {
-        id: data.credentialId,
-      },
-    });
+    const provider = data.provider ?? "google";
+    let model;
 
-    if (!credential) {
-      throw new NonRetriableError("Gemini node: Credential not found");
+    if (provider === "neon") {
+      try {
+        model = getNeonGeminiModel(data.model);
+      } catch (error) {
+        throw new NonRetriableError(
+          error instanceof Error
+            ? error.message
+            : "Gemini node: Neon AI Gateway is not configured"
+        );
+      }
+    } else {
+      if (!data.credentialId) {
+        throw new NonRetriableError("Gemini node: Credential is required");
+      }
+
+      const credential = await prisma.credential.findUnique({
+        where: {
+          id: data.credentialId,
+          userId: workflowOwnerId,
+        },
+      });
+
+      if (!credential) {
+        throw new NonRetriableError("Gemini node: Credential not found");
+      }
+
+      const google = createGoogleGenerativeAI({
+        apiKey: decryptCredentialValue(credential.value),
+      });
+      model = google(data.model ?? "gemini-2.5-flash");
     }
 
-    const google = createGoogleGenerativeAI({
-      apiKey: credential.value,
-    });
-
     const aiResult = await generateText({
-  model: google(data.model ?? "gemini-2.5-flash"),
-  system: systemPrompt,
-  prompt: userPrompt,
-});
+      model,
+      system: systemPrompt,
+      prompt: userPrompt,
+    });
 
     const text = aiResult.text ?? JSON.stringify(aiResult, null, 2);
 

@@ -32,6 +32,10 @@ import {
 
 import { parseWorkflowFile } from "../import-format";
 import { workflowTemplates } from "../demo-templates";
+import {
+  WorkflowBackupSaveItem,
+  WorkflowCloudBackupsButton,
+} from "./workflow-cloud-backups";
 
 import {
   EntityHeader,
@@ -140,6 +144,7 @@ export const WorkflowsList = () => {
               </DropdownMenuTrigger>
 
               <DropdownMenuContent align="end">
+                <WorkflowBackupSaveItem workflowId={workflow.id} />
                 <DropdownMenuItem
                   className="text-destructive"
                   onClick={(e) => {
@@ -228,7 +233,12 @@ export const WorkflowsHeader = ({
       newButtonLabel="New workflow"
       disabled={disabled}
       isCreating={createWorkflow.isPending}
-      actions={<WorkflowImportAction />}
+      actions={
+        <div className="flex items-center gap-2">
+          <WorkflowCloudBackupsButton disabled={disabled} />
+          <WorkflowImportAction />
+        </div>
+      }
     />
   );
 };

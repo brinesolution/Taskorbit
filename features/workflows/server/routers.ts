@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { Node, Edge } from "@xyflow/react";
 import { generateSlug } from "random-word-slugs";
 import { randomUUID } from "node:crypto";
+import { createWebhookToken, hashWebhookToken } from "@/features/trigger/server/webhook-token";
 import {
   stripCredentialReferences,
   workflowImportSchema,
@@ -30,6 +31,40 @@ import {
 } from "@/trpc/init";
 
 export const workflowsRouter = createTRPCRouter({
+  webhookCredentialStatus: protectedProcedure
+    .input(z.object({ workflowId: z.string(), provider: z.enum(["STRIPE", "GOOGLE_FORM"]) }))
+    .query(async ({ ctx, input }) => {
+      const workflow = await prisma.workflow.findFirstOrThrow({
+        where: { id: input.workflowId, userId: ctx.auth.user.id },
+      });
+      const triggerType = input.provider === "STRIPE" ? "STRIPE_TRIGGER" : "GOOGLE_FORM_TRIGGER";
+      const trigger = await prisma.node.findFirst({ where: { workflowId: workflow.id, type: triggerType } });
+      if (!trigger) throw new Error("Add the matching trigger node before configuring its webhook.");
+      const credential = await prisma.workflowWebhookCredential.findUnique({
+        where: { workflowId_provider: { workflowId: workflow.id, provider: input.provider } },
+        select: { id: true },
+      });
+      return { configured: Boolean(credential) };
+    }),
+
+  rotateWebhookCredential: protectedProcedure
+    .input(z.object({ workflowId: z.string(), provider: z.enum(["STRIPE", "GOOGLE_FORM"]) }))
+    .mutation(async ({ ctx, input }) => {
+      const workflow = await prisma.workflow.findFirstOrThrow({
+        where: { id: input.workflowId, userId: ctx.auth.user.id },
+      });
+      const triggerType = input.provider === "STRIPE" ? "STRIPE_TRIGGER" : "GOOGLE_FORM_TRIGGER";
+      const trigger = await prisma.node.findFirst({ where: { workflowId: workflow.id, type: triggerType } });
+      if (!trigger) throw new Error("Add the matching trigger node before configuring its webhook.");
+      const token = createWebhookToken();
+      await prisma.workflowWebhookCredential.upsert({
+        where: { workflowId_provider: { workflowId: workflow.id, provider: input.provider } },
+        create: { workflowId: workflow.id, provider: input.provider, tokenHash: hashWebhookToken(token) },
+        update: { tokenHash: hashWebhookToken(token) },
+      });
+      return { token };
+    }),
+
   execute: protectedProcedure
     .input(
       z.object({

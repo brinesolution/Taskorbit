@@ -17,12 +17,16 @@ import {
 
 import { fetchGeminiRealtimeToken } from "./actions";
 import { GEMINI_CHANNEL_NAME } from "@/inngest/channels/gemini";
+import { resolveGeminiPrompt } from "./prompt";
 
 type GeminiNodeData = {
+  provider?: "google" | "neon";
+  credentialId?: string;
   variableName?: string;
   model?: string;
   systemPrompt?: string;
   userPrompt?: string;
+  prompt?: string;
 };
 
 type GeminiNodeType = Node<GeminiNodeData>;
@@ -62,14 +66,17 @@ export const GeminiNode = memo(
     };
 
     const nodeData = props.data;
+    const provider = nodeData.provider ?? "google";
+    const prompt = resolveGeminiPrompt(nodeData);
+    const model =
+      nodeData.model ??
+      (provider === "neon" ? "Neon Gemini model" : "gemini-2.5-flash");
 
-    const description = nodeData?.userPrompt
-      ? `${
-          nodeData.model || "gemini-1.5-flash"
-        }: ${nodeData.userPrompt.slice(
+    const description = prompt
+      ? `${model}${provider === "neon" ? " via Neon" : ""}: ${prompt.slice(
           0,
           50
-        )}${nodeData.userPrompt.length > 50 ? "..." : ""}`
+        )}${prompt.length > 50 ? "..." : ""}`
       : "Not configured";
 
     return (
@@ -87,7 +94,7 @@ export const GeminiNode = memo(
           {...props}
           id={props.id}
           icon="/logos/gemini.svg"
-          name="Gemini"
+          name={provider === "neon" ? "Gemini via Neon" : "Gemini"}
           description={description}
           status={nodeStatus}
           onSettings={() =>

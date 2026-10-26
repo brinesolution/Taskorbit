@@ -3,8 +3,8 @@ import { z } from "zod";
 import {
   createTRPCRouter,
   protectedProcedure,
-   baseProcedure,
 } from "@/trpc/init";
+import { decryptCredentialValue, encryptCredentialValue } from "./encryption";
 
 const credentialTypes = [
   "OPENAI",
@@ -24,15 +24,22 @@ export const credentialsRouter = createTRPCRouter({
         value: z.string().min(1, "Value is required"),
       })
     )
-    .mutation(({ ctx, input }) => {
+    .mutation(async ({ ctx, input }) => {
       const { name, type, value } = input;
 
       return prisma.credential.create({
         data: {
           name,
           type,
-          value,
+          value: encryptCredentialValue(value),
           userId: ctx.auth.user.id,
+        },
+        select: {
+          id: true,
+          name: true,
+          type: true,
+          createdAt: true,
+          updatedAt: true,
         },
       });
     }),
@@ -68,15 +75,22 @@ export const credentialsRouter = createTRPCRouter({
         data: {
           name,
           type,
-          value,
+          value: encryptCredentialValue(value),
+        },
+        select: {
+          id: true,
+          name: true,
+          type: true,
+          createdAt: true,
+          updatedAt: true,
         },
       });
     }),
 
   getOne: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .query(({ ctx, input }) => {
-      return prisma.credential.findUniqueOrThrow({
+    .query(async ({ ctx, input }) => {
+      const credential = await prisma.credential.findUniqueOrThrow({
         where: {
           id: input.id,
           userId: ctx.auth.user.id,
@@ -90,9 +104,14 @@ export const credentialsRouter = createTRPCRouter({
           updatedAt: true,
         },
       });
+
+      return {
+        ...credential,
+        value: decryptCredentialValue(credential.value),
+      };
     }),
 
-  getMany: baseProcedure
+  getMany: protectedProcedure
   .input(
     z.object({
       page: z.number().default(1),
@@ -100,8 +119,9 @@ export const credentialsRouter = createTRPCRouter({
       search: z.string().default(""),
     })
   )
-  .query(async ({ input }) => {
+  .query(async ({ input, ctx }) => {
     const where = {
+      userId: ctx.auth.user.id,
       name: {
         contains: input.search,
         mode: "insensitive" as const,

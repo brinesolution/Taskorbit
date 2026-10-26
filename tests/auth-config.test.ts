@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { getAuthSetupStatus } from "../lib/auth-config.ts";
+import { getAuthSetupStatus } from "../lib/auth-config";
 
 test("auth remains unavailable until database, secret, and app URLs are configured", () => {
   assert.deepEqual(getAuthSetupStatus({}), {

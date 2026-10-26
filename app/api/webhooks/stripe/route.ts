@@ -1,5 +1,7 @@
 import { sendWorkflowExecution } from "@/inngest/utils";
 import { type NextRequest, NextResponse } from "next/server";
+import prisma from "@/lib/db";
+import { isWebhookTokenValid } from "@/features/trigger/server/webhook-token";
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,6 +16,17 @@ export async function POST(request: NextRequest) {
         },
         { status: 400 }
       );
+    }
+
+    const credential = await prisma.workflowWebhookCredential.findUnique({
+      where: { workflowId_provider: { workflowId, provider: "STRIPE" } },
+      select: { tokenHash: true },
+    });
+    const workflowHasTrigger = await prisma.node.findFirst({
+      where: { workflowId, type: "STRIPE_TRIGGER" }, select: { id: true },
+    });
+    if (!workflowHasTrigger || !isWebhookTokenValid(url.searchParams.get("token"), credential?.tokenHash)) {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();

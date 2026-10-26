@@ -83,10 +83,7 @@ export const executeWorkflow = inngest.createFunction(
 
         console.log("DB CONNECTIONS:", workflow.connections);
 
-        const nodes = topologicalSort(
-          workflow.nodes,
-          workflow.connections
-        );
+        const nodes = topologicalSort(workflow.nodes, workflow.connections);
 
         console.log(
           "Sorted nodes:",
@@ -97,13 +94,13 @@ export const executeWorkflow = inngest.createFunction(
 }))
         );
 
-        return nodes;
+        return { nodes, workflowOwnerId: workflow.userId };
       });
 
       let context: Record<string, unknown> =
         event.data.initialData || {};
 
-      for (const node of sortedNodes) {
+      for (const node of sortedNodes.nodes) {
         console.log("Executing node:", node.type, node.id);
 
         const executor = getExecutor(node.type as NodeTypeValue);
@@ -116,6 +113,7 @@ export const executeWorkflow = inngest.createFunction(
             return await executor({
               data: node.data as Record<string, unknown>,
               nodeId: node.id,
+              workflowOwnerId: sortedNodes.workflowOwnerId,
               context,
               step,
               publish,
