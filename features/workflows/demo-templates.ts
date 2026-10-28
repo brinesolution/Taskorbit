@@ -1,4 +1,5 @@
 import type { WorkflowImportFile } from "./import-format";
+import { DEFAULT_GOOGLE_GEMINI_MODEL } from "@/features/exections/components/gemini/model-policy";
 
 export type WorkflowTemplate = WorkflowImportFile & {
   description: string;
@@ -40,7 +41,8 @@ export const workflowTemplates: WorkflowTemplate[] = [
           position: { x: 300, y: 120 },
           data: {
             variableName: "leadSummary",
-            model: "gemini-2.0-flash",
+            provider: "google",
+            model: DEFAULT_GOOGLE_GEMINI_MODEL,
             systemPrompt:
               "You are a concise sales operations assistant. Highlight the lead's needs and one useful next step.",
             userPrompt:
@@ -148,6 +150,7 @@ export const workflowTemplates: WorkflowTemplate[] = [
           data: {
             variableName: "projectDigest",
             provider: "google",
+            model: DEFAULT_GOOGLE_GEMINI_MODEL,
             systemPrompt:
               "You write concise project updates for an engineering team.",
             userPrompt:

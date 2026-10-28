@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import type { Node, Edge } from "@xyflow/react";
 import { generateSlug } from "random-word-slugs";
@@ -8,6 +9,11 @@ import {
   stripCredentialReferences,
   workflowImportSchema,
 } from "../import-format";
+import {
+  getClientSafeDiscordNodeData,
+  getClientSafeWhatsAppNodeData,
+  prepareWhatsAppNodeDataForSave,
+} from "../whatsapp-legacy";
 import { MAX_PENDING_WORKFLOW_RUNS } from "../constants";
 const NodeType = {
   INITIAL: "INITIAL",
@@ -27,6 +33,7 @@ type NodeTypeValue = (typeof NodeType)[keyof typeof NodeType];
 import prisma from "@/lib/db";
 import { PAGINATION } from "@/config/constants";
 import { inngest } from "@/inngest/client";
+import { requireUniqueTrigger } from "@/inngest/utils";
 
 import {
   createTRPCRouter,
@@ -83,14 +90,23 @@ export const workflowsRouter = createTRPCRouter({
           },
         });
 
-      const manualTrigger = await prisma.node.findFirst({
+      const manualTriggers = await prisma.node.findMany({
         where: { workflowId: workflow.id, type: "MANUAL_TRIGGER" },
         select: { id: true },
       });
-      if (!manualTrigger) {
+      if (manualTriggers.length === 0) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Add a Manual Trigger to run this workflow manually.",
+        });
+      }
+      let manualTrigger: { id: string };
+      try {
+        manualTrigger = requireUniqueTrigger(manualTriggers, "Manual");
+      } catch (error) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: error instanceof Error ? error.message : "Keep only one Manual Trigger before running this workflow.",
         });
       }
 
@@ -100,6 +116,7 @@ export const workflowsRouter = createTRPCRouter({
         name: "workflows/execute.workflow",
         data: {
           workflowId: workflow.id,
+          triggerNodeId: manualTrigger.id,
         },
       });
 
@@ -136,7 +153,7 @@ export const workflowsRouter = createTRPCRouter({
         input.graph.nodes.map((node) => [node.id, randomUUID()] as const)
       );
 
-      return prisma.$transaction(async (tx: any) => {
+      return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const workflow = await tx.workflow.create({
           data: {
             name: input.name.trim(),
@@ -225,9 +242,11 @@ export const workflowsRouter = createTRPCRouter({
         where: { workflowId: id },
         select: { id: true, type: true, data: true },
       });
-      const existingById = new Map(existingNodes.map((node: any) => [node.id, node]));
+      const existingById = new Map(
+        existingNodes.map((node) => [node.id, node] as const)
+      );
 
-      return await prisma.$transaction(async (tx: any) => {
+      const updated = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         await tx.connection.deleteMany({
           where: {
             workflowId: id,
@@ -250,7 +269,7 @@ export const workflowsRouter = createTRPCRouter({
            data: (() => {
              const incoming = { ...(node.data ?? {}) };
              delete incoming.hasLegacyWebhook;
-             const existing = existingById.get(node.id) as any;
+             const existing = existingById.get(node.id);
              const priorData = existing?.data as Record<string, unknown> | null;
              // Preserve hidden legacy webhook data during unrelated editor saves;
              // selecting a saved credential explicitly retires the legacy value.
@@ -259,7 +278,13 @@ export const workflowsRouter = createTRPCRouter({
                  typeof priorData?.webhookUrl === "string") {
                incoming.webhookUrl = priorData.webhookUrl;
              }
-             return JSON.parse(JSON.stringify(incoming));
+             const safeData = prepareWhatsAppNodeDataForSave(
+               node.type,
+               incoming,
+               existing?.type,
+               priorData,
+             );
+             return JSON.parse(JSON.stringify(safeData));
            })(),
           })),
         });
@@ -287,6 +312,22 @@ export const workflowsRouter = createTRPCRouter({
           },
         });
       });
+      const updatedNodes = updated.nodes as Array<{
+        type: string;
+        data: unknown;
+        [key: string]: unknown;
+      }>;
+      return {
+        ...updated,
+        nodes: updatedNodes.map((node) => ({
+          ...node,
+          data: node.type === "WHATSAPP"
+            ? getClientSafeWhatsAppNodeData((node.data as Record<string, unknown>) ?? {})
+            : node.type === "DISCORD"
+              ? getClientSafeDiscordNodeData((node.data as Record<string, unknown>) ?? {})
+              : node.data,
+        })),
+      };
     }),
 
   updateName: protectedProcedure
@@ -323,7 +364,7 @@ export const workflowsRouter = createTRPCRouter({
           },
         });
 
-      const nodes: Node[] = workflow.nodes.map((node: any) => ({
+      const nodes: Node[] = workflow.nodes.map((node) => ({
         id: node.id,
         type: node.type,
         position: node.position as {
@@ -332,15 +373,15 @@ export const workflowsRouter = createTRPCRouter({
         },
         data: (() => {
           const data = { ...((node.data as Record<string, unknown>) || {}) };
-          if (typeof data.webhookUrl === "string" && data.webhookUrl.length > 0) {
-            data.hasLegacyWebhook = true;
-            delete data.webhookUrl;
+          if (node.type === "WHATSAPP") {
+            return getClientSafeWhatsAppNodeData(data);
           }
+          if (node.type === "DISCORD") return getClientSafeDiscordNodeData(data);
           return data;
         })(),
       }));
 const edges: Edge[] = workflow.connections.map(
-  (connection: any) => ({
+  (connection) => ({
     id: connection.id,
     source: connection.fromNodeId,
     target: connection.toNodeId,

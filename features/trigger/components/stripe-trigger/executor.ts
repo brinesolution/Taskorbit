@@ -8,7 +8,6 @@ export const stripeTriggerExecutor: NodeExecutor<
 > = async ({
   nodeId,
   context,
-  step,
   publish,
 }) => {
   await publish(
@@ -18,11 +17,6 @@ export const stripeTriggerExecutor: NodeExecutor<
     })
   );
 
-  const result = await step.run(
-    "stripe-trigger",
-    async () => context
-  );
-
   await publish(
     stripeTriggerChannel().status({
       nodeId,
@@ -30,5 +24,5 @@ export const stripeTriggerExecutor: NodeExecutor<
     })
   );
 
-  return result;
+  return context;
 };

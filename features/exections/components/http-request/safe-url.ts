@@ -57,7 +57,7 @@ function isPublicIPv6(address: string): boolean {
   // documentation, transition and discard ranges within it.
   if (!prefix(BigInt(1), 3)) return false;
   return !(
-    prefix(BigInt("0x400200"), 23) || // IETF protocol assignments, including Teredo
+    prefix(BigInt("0x100080"), 23) || // 2001::/23 IETF protocol assignments, including Teredo
     prefix(BigInt("0x20010db8"), 32) || // documentation
     prefix(BigInt("0x2002"), 16) || // 6to4 embeds IPv4 routing
     prefix(BigInt("0x3fff0"), 20) // documentation
@@ -113,7 +113,7 @@ export async function assertSafeHttpUrl(
  * remains intact for Host and TLS SNI while the socket connects to the vetted IP.
  */
 export function createPinnedLookup(address: Address): LookupFunction {
-  return ((_hostname: string, options: { all?: boolean }, callback: (...args: any[]) => void) => {
+  return ((_hostname: string, options: { all?: boolean }, callback: Parameters<LookupFunction>[2]) => {
     if (options?.all) callback(null, [{ address: address.address, family: address.family }]);
     else callback(null, address.address, address.family);
   }) as LookupFunction;
@@ -149,7 +149,6 @@ export function sendPinnedRequest(
   const maxResponseBytes = limits.maxResponseBytes ?? HTTP_RESPONSE_BODY_LIMIT_BYTES;
   return new Promise((resolve, reject) => {
     let settled = false;
-    let timeout: ReturnType<typeof setTimeout>;
     const fail = (error: Error) => {
       if (settled) return;
       settled = true;
@@ -187,7 +186,7 @@ export function sendPinnedRequest(
         });
       });
     });
-    timeout = setTimeout(() => {
+    const timeout = setTimeout(() => {
       fail(new Error(`HTTP request timed out after ${timeoutMs} ms`));
       request.destroy();
     }, timeoutMs);

@@ -41,6 +41,10 @@ export const useCreateCredential = () => {
         await queryClient.invalidateQueries(
           trpc.credentials.getMany.queryFilter()
         );
+
+        await queryClient.invalidateQueries(
+          trpc.credentials.getByType.queryFilter()
+        );
       },
       onError: (error) => {
         toast.error(`Failed to create credential: ${error.message}`);
@@ -60,6 +64,10 @@ export const useRemoveCredential = () => {
 
         await queryClient.invalidateQueries(
           trpc.credentials.getMany.queryFilter()
+        );
+
+        await queryClient.invalidateQueries(
+          trpc.credentials.getByType.queryFilter()
         );
 
         await queryClient.invalidateQueries(
@@ -92,6 +100,10 @@ export const useUpdateCredential = () => {
 
         await queryClient.invalidateQueries(
           trpc.credentials.getMany.queryFilter()
+        );
+
+        await queryClient.invalidateQueries(
+          trpc.credentials.getByType.queryFilter()
         );
 
         await queryClient.invalidateQueries(

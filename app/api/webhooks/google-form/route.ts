@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { sendWorkflowExecution } from "@/inngest/utils";
+import { requireUniqueTrigger, sendWorkflowExecution } from "@/inngest/utils";
 import prisma from "@/lib/db";
 import { isWebhookTokenValid } from "@/features/trigger/server/webhook-token";
 
@@ -23,12 +23,26 @@ export async function POST(request: NextRequest) {
       where: { workflowId_provider: { workflowId, provider: "GOOGLE_FORM" } },
       select: { tokenHash: true },
     });
-    const workflowHasTrigger = await prisma.node.findFirst({
-      where: { workflowId, type: "GOOGLE_FORM_TRIGGER" }, select: { id: true },
-    });
     const bearer = request.headers.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1];
-    if (!workflowHasTrigger || !isWebhookTokenValid(bearer, credential?.tokenHash)) {
+    if (!isWebhookTokenValid(bearer, credential?.tokenHash)) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+
+    const formTriggers = await prisma.node.findMany({
+      where: { workflowId, type: "GOOGLE_FORM_TRIGGER" },
+      select: { id: true },
+    });
+    if (formTriggers.length === 0) {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+    let formTrigger: { id: string };
+    try {
+      formTrigger = requireUniqueTrigger(formTriggers, "Google Forms");
+    } catch (error) {
+      return NextResponse.json(
+        { success: false, error: error instanceof Error ? error.message : "Keep only one Google Forms trigger." },
+        { status: 409 },
+      );
     }
 
     const body = await request.json();
@@ -45,6 +59,7 @@ export async function POST(request: NextRequest) {
 
     await sendWorkflowExecution({
       workflowId,
+      triggerNodeId: formTrigger.id,
       initialData: {
         googleForm: formData,
       },

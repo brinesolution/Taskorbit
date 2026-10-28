@@ -39,6 +39,18 @@ test("rejects unsafe IPv6 and permits a public IPv6 literal", async () => {
   assert.equal(safe.address.family, 6);
 });
 
+test("rejects the 2001::/23 protocol-assignment range but permits its next boundary", async () => {
+  for (const host of ["2001::1", "2001:1::1", "2001:1ff::1"]) {
+    await assert.rejects(
+      assertSafeHttpUrl(`https://[${host}]/`),
+      /publicly routable/
+    );
+  }
+
+  const boundary = await assertSafeHttpUrl("https://[2001:200::1]/");
+  assert.equal(boundary.address.address, "2001:200::1");
+});
+
 test("pins the actual Node socket lookup to the vetted address and preserves hostname", async () => {
   const endpoint = await assertSafeHttpUrl("https://service.example.test/path", async () => [
     { address: "93.184.216.34", family: 4 },

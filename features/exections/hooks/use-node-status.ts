@@ -1,6 +1,6 @@
 import type { Realtime } from "@inngest/realtime";
 import { useInngestSubscription } from "@inngest/realtime/hooks";
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 
 import type { NodeStatus } from "@/components/react-flow/node-status-indicator";
 
@@ -17,20 +17,14 @@ export function useNodeStatus({
   topic,
   refreshToken,
 }: UseNodeStatusOptions) {
-  const [status, setStatus] = useState<NodeStatus>("initial");
-
   const { data } = useInngestSubscription({
     refreshToken,
     enabled: true,
   });
 
-  useEffect(() => {
-    if (!data?.length) {
-      return;
-    }
-
+  return useMemo(() => {
     const latestMessage = data
-      .filter(
+      ?.filter(
         (msg) =>
           msg.kind === "data" &&
           msg.channel === channel &&
@@ -48,10 +42,8 @@ export function useNodeStatus({
         return 0;
       })[0];
 
-    if (latestMessage?.kind === "data") {
-      setStatus(latestMessage.data.status as NodeStatus);
-    }
+    return latestMessage?.kind === "data"
+      ? (latestMessage.data.status as NodeStatus)
+      : "initial";
   }, [data, channel, topic, nodeId]);
-
-  return status;
 }

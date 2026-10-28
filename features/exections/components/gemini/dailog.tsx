@@ -19,6 +19,7 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -37,6 +38,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { resolveGeminiPrompt } from "./prompt";
+import {
+  DEFAULT_GOOGLE_GEMINI_MODEL,
+  GOOGLE_GEMINI_MODEL_OPTIONS,
+  GOOGLE_GEMINI_PRICING_URL,
+  isPotentiallyUnavailableLegacyGeminiModel,
+} from "./model-policy";
 
 const formSchema = z
   .object({
@@ -100,7 +107,7 @@ export const GeminiDialog = ({
     defaultValues: {
       provider: defaultValues?.provider ?? "google",
       credentialId: defaultValues?.credentialId ?? "",
-      model: defaultValues?.model ?? "gemini-2.5-flash",
+      model: defaultValues?.model ?? DEFAULT_GOOGLE_GEMINI_MODEL,
       prompt: resolveGeminiPrompt(defaultValues ?? {}),
       variableName: defaultValues?.variableName ?? "gemini",
     },
@@ -156,7 +163,8 @@ export const GeminiDialog = ({
           </DialogTitle>
           <DialogDescription>
             Configure a Gemini prompt. Neon AI Gateway requires a paid Neon
-            plan and uses prepaid AI credits.
+            plan and uses prepaid AI credits. Saving here updates this node in
+            the editor; click Save workflow in the top bar to persist your changes.
           </DialogDescription>
         </DialogHeader>
 
@@ -199,48 +207,96 @@ export const GeminiDialog = ({
             />
 
             {provider === "google" ? (
-              <FormField
-                control={form.control}
-                name="credentialId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Credential</FormLabel>
-                    <Select
-                      disabled={isLoadingCredentials}
-                      value={field.value}
-                      onValueChange={field.onChange}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select Gemini credential" />
-                        </SelectTrigger>
-                      </FormControl>
+              <>
+                <FormField
+                  control={form.control}
+                  name="credentialId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Credential</FormLabel>
+                      <Select
+                        disabled={isLoadingCredentials}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select Gemini credential" />
+                          </SelectTrigger>
+                        </FormControl>
 
-                      <SelectContent>
-                        {(credentials as CredentialOption[]).map(
-                          (credential) => (
-                            <SelectItem
-                              key={credential.id}
-                              value={credential.id}
-                            >
-                              <div className="flex items-center gap-2">
-                                <Image
-                                  src="/logos/gemini.svg"
-                                  alt="Gemini"
-                                  width={16}
-                                  height={16}
-                                />
-                                {credential.name}
-                              </div>
-                            </SelectItem>
-                          )
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                        <SelectContent>
+                          {(credentials as CredentialOption[]).map(
+                            (credential) => (
+                              <SelectItem
+                                key={credential.id}
+                                value={credential.id}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <Image
+                                    src="/logos/gemini.svg"
+                                    alt="Gemini"
+                                    width={16}
+                                    height={16}
+                                  />
+                                  {credential.name}
+                                </div>
+                              </SelectItem>
+                            )
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="model"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Google Gemini model</FormLabel>
+                      <FormControl>
+                        <Input
+                          list="google-gemini-models"
+                          placeholder={DEFAULT_GOOGLE_GEMINI_MODEL}
+                          {...field}
+                        />
+                      </FormControl>
+                      <datalist id="google-gemini-models">
+                        {GOOGLE_GEMINI_MODEL_OPTIONS.map((model) => (
+                          <option key={model.id} value={model.id}>
+                            {model.name}
+                          </option>
+                        ))}
+                        {field.value &&
+                        !GOOGLE_GEMINI_MODEL_OPTIONS.some(
+                          (model) => model.id === field.value,
+                        ) ? (
+                          <option value={field.value}>Current/custom model</option>
+                        ) : null}
+                      </datalist>
+                      {isPotentiallyUnavailableLegacyGeminiModel(field.value) ? (
+                        <FormDescription className="text-amber-600 dark:text-amber-400">
+                          This older model may be unavailable to your project. Choose a current model above or enter another model ID.
+                        </FormDescription>
+                      ) : null}
+                      <FormDescription>
+                        Free-tier access depends on your Google AI project and region. You can also enter a custom model ID. See{" "}
+                        <a
+                          href={GOOGLE_GEMINI_PRICING_URL}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="underline underline-offset-4"
+                        >
+                          Google AI pricing
+                        </a>.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
             ) : (
               <FormField
                 control={form.control}
@@ -320,7 +376,7 @@ export const GeminiDialog = ({
             />
 
             <Button type="submit" className="w-full">
-              Save
+              Save node
             </Button>
           </form>
         </Form>

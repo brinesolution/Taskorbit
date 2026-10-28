@@ -1,8 +1,9 @@
 import { NonRetriableError } from "inngest";
+import type { NodeType } from "@prisma/client";
 
 import { inngest } from "./client";
 import prisma from "../lib/db";
-import { topologicalSort } from "./utils";
+import { planWorkflowExecution } from "./utils";
 import { getExecutor } from "../lib/executor-registry";
 
 import { httpRequestChannel } from "./channels/http-request";
@@ -12,21 +13,7 @@ import { stripeTriggerChannel } from "./channels/stripe-trigger";
 import { geminiChannel } from "./channels/gemini";
 import { discordChannel } from "./channels/discord";
 import { telegramChannel } from "./channels/telegram";
-
-const NodeType = {
-  INITIAL: "INITIAL",
-  MANUAL_TRIGGER: "MANUAL_TRIGGER",
-  GOOGLE_FORM_TRIGGER: "GOOGLE_FORM_TRIGGER",
-  STRIPE_TRIGGER: "STRIPE_TRIGGER",
-  HTTP_REQUEST: "HTTP_REQUEST",
-  GEMINI: "GEMINI",
-  DISCORD: "DISCORD",
-  WHATSAPP: "WHATSAPP",
-  TELEGRAM: "TELEGRAM",
-} as const;
-
-type NodeTypeValue =
-  (typeof NodeType)[keyof typeof NodeType];
+import { prepareWhatsAppNodeDataForExecution } from "@/features/workflows/whatsapp-legacy";
 
 export const executeWorkflow = inngest.createFunction(
   {
@@ -75,8 +62,12 @@ export const executeWorkflow = inngest.createFunction(
           },
         });
 
-        const sortedNodes = topologicalSort(workflow.nodes, workflow.connections);
-        const nodes = sortedNodes.map((node: any) => {
+        const plan = planWorkflowExecution(
+          workflow.nodes,
+          workflow.connections,
+          event.data,
+        );
+        const nodes = plan.nodes.map((node) => {
           if (node.type === "TELEGRAM") {
             const storedData = (node.data as Record<string, unknown>) ?? {};
             const data = Object.fromEntries(
@@ -85,6 +76,14 @@ export const executeWorkflow = inngest.createFunction(
                 .map((key) => [key, storedData[key]])
             );
             return { ...node, data };
+          }
+          if (node.type === "WHATSAPP") {
+            return {
+              ...node,
+              data: prepareWhatsAppNodeDataForExecution(
+                (node.data as Record<string, unknown>) ?? {},
+              ),
+            };
           }
           if (node.type !== "DISCORD") return node;
           const data = { ...((node.data as Record<string, unknown>) ?? {}) };
@@ -95,16 +94,20 @@ export const executeWorkflow = inngest.createFunction(
           return { ...node, data };
         });
 
-        return { nodes, workflowOwnerId: workflow.userId };
+        return {
+          nodes,
+          initialData: plan.initialData,
+          workflowId: workflow.id,
+          workflowOwnerId: workflow.userId,
+        };
       });
 
-      let context: Record<string, unknown> =
-        event.data.initialData || {};
+      let context: Record<string, unknown> = sortedNodes.initialData;
 
       for (const node of sortedNodes.nodes) {
         console.log("Executing node:", node.type, node.id);
 
-        const executor = getExecutor(node.type as NodeTypeValue);
+        const executor = getExecutor(node.type as NodeType);
 
         context = await step.run(
           `execute-${node.type}-${node.id}`,
@@ -114,6 +117,7 @@ export const executeWorkflow = inngest.createFunction(
             return await executor({
               data: node.data as Record<string, unknown>,
               nodeId: node.id,
+              workflowId: sortedNodes.workflowId,
               workflowOwnerId: sortedNodes.workflowOwnerId,
               context,
               step,

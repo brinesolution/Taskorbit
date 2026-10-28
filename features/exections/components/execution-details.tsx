@@ -19,6 +19,7 @@ export const ExecutionDetails = ({
     id: string;
     status: "RUNNING" | "SUCCESS" | "FAILED";
     startedAt: string | Date;
+    error?: string | null;
     workflow: {
       name: string;
     };
@@ -44,6 +45,7 @@ export const ExecutionDetails = ({
           executionId={executionId}
           userId={userId}
           initialStatus={execution.status}
+          initialError={execution.error}
         />
       </div>
 

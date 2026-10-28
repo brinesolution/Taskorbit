@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { Button } from "@/components/ui/button";
@@ -114,10 +114,12 @@ export const HttpRequestDialog = ({
     }
   }, [open, defaultValues, form]);
 
-  const watchVariableName =
-    form.watch("variableName");
+  const watchVariableName = useWatch({
+    control: form.control,
+    name: "variableName",
+  });
 
-  const watchMethod = form.watch("method");
+  const watchMethod = useWatch({ control: form.control, name: "method" });
 
   const showBodyField = [
     "POST",

@@ -9,6 +9,7 @@ import { createTRPCContext } from "@trpc/tanstack-react-query";
 import { useState } from "react";
 
 import { makeQueryClient } from "./query-client";
+import { resolveTRPCUrl } from "./base-url";
 import type { AppRouter } from "./routers/_app";
 
 export const { TRPCProvider, useTRPC } =
@@ -37,14 +38,21 @@ export function TRPCReactProvider(
     createTRPCClient<AppRouter>({
       links: [
         httpBatchLink({
-  url: "/api/trpc",
-  fetch(url, options) {
-    return fetch(url, {
-      ...options,
-      credentials: "include",
-    });
-  },
-}),
+          url: resolveTRPCUrl({
+            isServer: typeof window === "undefined",
+            vercelUrl: process.env.VERCEL_URL,
+            appUrl: process.env.NEXT_PUBLIC_APP_URL,
+            nodeEnv: process.env.NODE_ENV,
+            port: process.env.PORT,
+            nextPhase: process.env.NEXT_PHASE,
+          }),
+          fetch(url, options) {
+            return fetch(url, {
+              ...options,
+              credentials: "include",
+            });
+          },
+        }),
       ],
     })
   );

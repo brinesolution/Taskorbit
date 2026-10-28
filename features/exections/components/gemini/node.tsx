@@ -18,6 +18,7 @@ import {
 import { fetchGeminiRealtimeToken } from "./actions";
 import { GEMINI_CHANNEL_NAME } from "@/inngest/channels/gemini";
 import { resolveGeminiPrompt } from "./prompt";
+import { DEFAULT_GOOGLE_GEMINI_MODEL } from "./model-policy";
 
 type GeminiNodeData = {
   provider?: "google" | "neon";
@@ -70,7 +71,7 @@ export const GeminiNode = memo(
     const prompt = resolveGeminiPrompt(nodeData);
     const model =
       nodeData.model ??
-      (provider === "neon" ? "Neon Gemini model" : "gemini-2.5-flash");
+      (provider === "neon" ? "Neon Gemini model" : DEFAULT_GOOGLE_GEMINI_MODEL);
 
     const description = prompt
       ? `${model}${provider === "neon" ? " via Neon" : ""}: ${prompt.slice(

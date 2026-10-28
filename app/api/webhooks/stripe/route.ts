@@ -1,4 +1,4 @@
-import { sendWorkflowExecution } from "@/inngest/utils";
+import { requireUniqueTrigger, sendWorkflowExecution } from "@/inngest/utils";
 import { type NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { isWebhookTokenValid } from "@/features/trigger/server/webhook-token";
@@ -22,11 +22,25 @@ export async function POST(request: NextRequest) {
       where: { workflowId_provider: { workflowId, provider: "STRIPE" } },
       select: { tokenHash: true },
     });
-    const workflowHasTrigger = await prisma.node.findFirst({
-      where: { workflowId, type: "STRIPE_TRIGGER" }, select: { id: true },
-    });
-    if (!workflowHasTrigger || !isWebhookTokenValid(url.searchParams.get("token"), credential?.tokenHash)) {
+    if (!isWebhookTokenValid(url.searchParams.get("token"), credential?.tokenHash)) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+
+    const stripeTriggers = await prisma.node.findMany({
+      where: { workflowId, type: "STRIPE_TRIGGER" },
+      select: { id: true },
+    });
+    if (stripeTriggers.length === 0) {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+    let stripeTrigger: { id: string };
+    try {
+      stripeTrigger = requireUniqueTrigger(stripeTriggers, "Stripe");
+    } catch (error) {
+      return NextResponse.json(
+        { success: false, error: error instanceof Error ? error.message : "Keep only one Stripe trigger." },
+        { status: 409 },
+      );
     }
 
     const body = await request.json();
@@ -45,6 +59,7 @@ export async function POST(request: NextRequest) {
 
     await sendWorkflowExecution({
       workflowId,
+      triggerNodeId: stripeTrigger.id,
       initialData: {
         stripe: stripeData,
       },
