@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useTRPC } from "@/trpc/client";
+import { buildGoogleFormAppsScript } from "@/features/trigger/google-form-apps-script";
 
 type Props = { open: boolean; onOpenChange: (open: boolean) => void };
 
@@ -24,7 +25,7 @@ export const GoogleFormTriggerDialog = ({ open, onOpenChange }: Props) => {
   }));
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== "undefined" ? window.location.origin : "");
   const webhookUrl = `${baseUrl}/api/webhooks/google-form?workflowId=${encodeURIComponent(workflowId)}`;
-  const script = token ? `function onFormSubmit(e) {\n  const response = e.response;\n  const answers = {};\n  response.getItemResponses().forEach(item => { answers[item.getItem().getTitle()] = item.getResponse(); });\n  const payload = { formId: e.source.getId(), formTitle: e.source.getTitle(), responseId: response.getId(), timestamp: response.getTimestamp(), respondentEmail: response.getRespondentEmail(), responses: answers };\n  UrlFetchApp.fetch(${JSON.stringify(webhookUrl)}, { method: "post", contentType: "application/json", headers: { Authorization: ${JSON.stringify(`Bearer ${token}`)} }, payload: JSON.stringify(payload), muteHttpExceptions: true });\n}` : "Create or rotate the secret to generate the authenticated script.";
+  const script = token ? buildGoogleFormAppsScript(webhookUrl, token) : "Create or rotate the secret to generate the authenticated script.";
   const copy = async (value: string, label: string) => { try { await navigator.clipboard.writeText(value); toast.success(`${label} copied`); } catch { toast.error(`Could not copy ${label.toLowerCase()}`); } };
 
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent>

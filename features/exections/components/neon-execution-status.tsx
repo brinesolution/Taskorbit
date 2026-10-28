@@ -20,6 +20,7 @@ interface NeonExecutionStatusProps {
   executionId: string;
   userId: string;
   initialStatus: ExecutionRealtimeRow["status"];
+  initialError?: string | null;
 }
 
 let sessionChangeReloadStarted = false;
@@ -62,6 +63,7 @@ export function NeonExecutionStatus({
   executionId,
   userId,
   initialStatus,
+  initialError,
 }: NeonExecutionStatusProps) {
   const [request, setRequest] = useState<
     | { executionId: string; status: "ready"; bootstrap: LiveBootstrap }
@@ -101,6 +103,9 @@ export function NeonExecutionStatus({
             ? "Live status is unavailable. Showing the last saved status."
             : "Connecting to live status…"}
         </p>
+        {initialStatus === "FAILED" && initialError ? (
+          <p className="mt-2 text-sm text-destructive">{initialError}</p>
+        ) : null}
       </div>
     );
   }
@@ -112,6 +117,7 @@ export function NeonExecutionStatus({
       executionId={executionId}
       userId={userId}
       initialStatus={initialStatus}
+      initialError={initialError}
     />
   );
 }
@@ -121,6 +127,7 @@ function ExecutionStatusSubscription({
   executionId,
   userId,
   initialStatus,
+  initialError,
 }: NeonExecutionStatusProps & { bootstrap: LiveBootstrap }) {
   // This component mounts only after the browser fetched the public Realtime URL.
   const [client] = useState(() =>
@@ -134,6 +141,7 @@ function ExecutionStatusSubscription({
         executionId={executionId}
         userId={userId}
         initialStatus={initialStatus}
+        initialError={initialError}
       />
     </RealtimeProvider>
   );
@@ -144,29 +152,32 @@ function LiveExecutionStatus({
   executionId,
   userId,
   initialStatus,
+  initialError,
 }: NeonExecutionStatusProps & { bootstrap: LiveBootstrap }) {
   const refreshQuery = useCallback(async () => {
     const renewed = await fetchLiveBootstrap(executionId, userId);
     return renewed.sealedQuery;
   }, [executionId, userId]);
 
-  const { data, status } = useLiveQuery(bootstrap.sealedQuery, {
+  const { data, status: liveQueryStatus } = useLiveQuery(bootstrap.sealedQuery, {
     refreshQuery,
   });
   const execution = data?.[0];
+  const status = execution?.status ?? initialStatus;
+  const error = execution?.error ?? (status === "FAILED" ? initialError : null);
 
   return (
     <div>
-      <p>{execution?.status ?? initialStatus}</p>
+      <p>{status}</p>
       <p className="text-sm text-muted-foreground" role="status">
-        {status === "error"
+        {liveQueryStatus === "error"
           ? "Live updates stopped. Showing the last saved status."
-          : status === "stale"
+          : liveQueryStatus === "stale"
             ? "Refreshing live status…"
             : "Live status connected"}
       </p>
-      {execution?.error ? (
-        <p className="mt-2 text-sm text-destructive">{execution.error}</p>
+      {error ? (
+        <p className="mt-2 text-sm text-destructive">{error}</p>
       ) : null}
     </div>
   );

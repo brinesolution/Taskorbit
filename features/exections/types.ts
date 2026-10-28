@@ -10,6 +10,7 @@ export interface NodeExecutorParams<
 > {
   data: TData;
   nodeId: string;
+  workflowId?: string;
   workflowOwnerId: string;
   context: WorkflowContext;
   step: StepTools;

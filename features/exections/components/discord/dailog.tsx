@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import { z } from "zod";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { Button } from "@/components/ui/button";
@@ -99,7 +99,12 @@ export const DiscordDialog = ({
     }
   }, [open, defaultValues, form]);
 
-  const watchVariableName = form.watch("variableName") || "myDiscord";
+  const watchVariableName =
+    useWatch({ control: form.control, name: "variableName" }) || "myDiscord";
+  const watchCredentialId = useWatch({
+    control: form.control,
+    name: "credentialId",
+  });
 
   const handleSubmit = (values: DiscordFormValues) => {
     onSubmit(values);
@@ -129,7 +134,7 @@ export const DiscordDialog = ({
             onSubmit={form.handleSubmit(handleSubmit)}
             className="space-y-6"
           >
-            {hasLegacyWebhook && !form.watch("credentialId") && (
+            {hasLegacyWebhook && !watchCredentialId && (
               <p className="text-sm text-destructive" role="alert">
                 This node has an older webhook setting. It is hidden for security;
                 select a saved Discord credential to replace it before saving.

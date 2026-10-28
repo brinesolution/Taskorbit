@@ -9,6 +9,7 @@ import { getNeonGeminiModel } from "@/lib/neon/ai-gateway";
 import type { NodeExecutor } from "../../types";
 import { geminiChannel } from "@/inngest/channels/gemini";
 import { resolveGeminiPrompt } from "./prompt";
+import { createGoogleGeminiModel } from "./model-policy";
 import { decryptCredentialValue } from "@/features/credentials/server/encryption";
 
 Handlebars.registerHelper("json", (context) => {
@@ -77,21 +78,25 @@ export const geminiExecutor: NodeExecutor<GeminiData> = async ({
         throw new NonRetriableError("Gemini node: Credential is required");
       }
 
-      const credential = await prisma.credential.findUnique({
+      const credential = await prisma.credential.findFirst({
         where: {
           id: data.credentialId,
           userId: workflowOwnerId,
+          type: "GEMINI",
         },
+        select: { value: true },
       });
 
       if (!credential) {
-        throw new NonRetriableError("Gemini node: Credential not found");
+        throw new NonRetriableError(
+          "Gemini node: Select a Gemini credential, then save the node and workflow."
+        );
       }
 
       const google = createGoogleGenerativeAI({
         apiKey: decryptCredentialValue(credential.value),
       });
-      model = google(data.model ?? "gemini-2.5-flash");
+      model = createGoogleGeminiModel(data.model, google);
     }
 
     const aiResult = await generateText({

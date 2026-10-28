@@ -118,8 +118,8 @@ export const EditorSaveButton = ({
       >
         <SaveIcon className="size-4 mr-2" />
         {saveWorkflow.isPending
-          ? "Saving..."
-          : "Save"}
+          ? "Saving workflow..."
+          : "Save workflow"}
       </Button>
     </div>
   );

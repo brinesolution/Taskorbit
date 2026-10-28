@@ -25,6 +25,7 @@ type Provider = "STRIPE" | "GOOGLE_FORM";
 type Fixture = {
   credentialExists: boolean;
   triggerExists: boolean;
+  triggerIds?: string[];
   dispatches: Array<{ name: string; data: unknown }>;
 };
 
@@ -33,16 +34,20 @@ const credentialDelegate = prisma.workflowWebhookCredential as unknown as {
 };
 const nodeDelegate = prisma.node as unknown as {
   findFirst: (args: unknown) => Promise<{ id: string } | null>;
+  findMany: (args: unknown) => Promise<{ id: string }[]>;
 };
 const originalCredentialLookup = credentialDelegate.findUnique;
 const originalTriggerLookup = nodeDelegate.findFirst;
+const originalTriggersLookup = nodeDelegate.findMany;
 const originalSend = inngest.send;
 
 function installFixture(fixture: Fixture) {
   credentialDelegate.findUnique = async () =>
     fixture.credentialExists ? { tokenHash } : null;
-  nodeDelegate.findFirst = async () =>
-    fixture.triggerExists ? { id: "trigger-node" } : null;
+  const triggerNodes = fixture.triggerIds?.map((id) => ({ id })) ??
+    (fixture.triggerExists ? [{ id: "trigger-node" }] : []);
+  nodeDelegate.findFirst = async () => triggerNodes[0] ?? null;
+  nodeDelegate.findMany = async () => triggerNodes;
   inngest.send = async (event) => {
     fixture.dispatches.push(event as { name: string; data: unknown });
     return { ids: ["test-event"] };
@@ -52,6 +57,7 @@ function installFixture(fixture: Fixture) {
 function restoreClients() {
   credentialDelegate.findUnique = originalCredentialLookup;
   nodeDelegate.findFirst = originalTriggerLookup;
+  nodeDelegate.findMany = originalTriggersLookup;
   inngest.send = originalSend;
 }
 
@@ -86,6 +92,7 @@ async function post(provider: Provider, options: {
     assert.equal(fixture.dispatches.length, 1);
     assert.deepEqual(fixture.dispatches[0]?.data, {
       workflowId: "workflow-1",
+      triggerNodeId: "trigger-node",
       initialData: { googleForm: {
         formId: undefined,
         formTitle: undefined,
@@ -108,6 +115,50 @@ for (const [label, bearer] of [["missing", undefined], ["wrong", "incorrect-toke
     try {
       const response = await post("GOOGLE_FORM", { workflowId: "workflow-1", bearer });
       assert.equal(response.status, 401);
+      assert.equal(fixture.dispatches.length, 0);
+    } finally {
+      restoreClients();
+    }
+  });
+}
+
+for (const provider of ["GOOGLE_FORM", "STRIPE"] as const) {
+  await t.test(`${provider} webhook keeps returning 401 for an unauthenticated duplicate-trigger request`, async () => {
+    const fixture: Fixture = {
+      credentialExists: true,
+      triggerExists: true,
+      triggerIds: ["trigger-one", "trigger-two"],
+      dispatches: [],
+    };
+    installFixture(fixture);
+    try {
+      const response = await post(provider, { workflowId: "workflow-1" });
+      assert.equal(response.status, 401);
+      assert.equal(fixture.dispatches.length, 0);
+    } finally {
+      restoreClients();
+    }
+  });
+}
+
+for (const provider of ["GOOGLE_FORM", "STRIPE"] as const) {
+  await t.test(`${provider} webhook rejects duplicate triggers after authentication without enqueueing`, async () => {
+    const fixture: Fixture = {
+      credentialExists: true,
+      triggerExists: true,
+      triggerIds: ["trigger-one", "trigger-two"],
+      dispatches: [],
+    };
+    installFixture(fixture);
+    try {
+      const response = await post(provider, {
+        workflowId: "workflow-1",
+        bearer: token,
+        stripeToken: token,
+      });
+      assert.equal(response.status, 409);
+      const body = await response.json();
+      assert.match(body.error, /multiple.*trigger/i);
       assert.equal(fixture.dispatches.length, 0);
     } finally {
       restoreClients();
@@ -141,6 +192,7 @@ for (const [label, overrides] of [
     assert.equal(fixture.dispatches.length, 1);
     assert.deepEqual(fixture.dispatches[0]?.data, {
       workflowId: "workflow-1",
+      triggerNodeId: "trigger-node",
       initialData: { stripe: {
         eventId: requestBody.id,
         eventType: requestBody.type,
